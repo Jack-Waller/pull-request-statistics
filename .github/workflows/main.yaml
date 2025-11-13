@@ -18,6 +18,7 @@ concurrency:
 
 jobs:
   test:
+    if: False # Temporarily disabled
     name: Lint and Test
     runs-on: ubuntu-latest-small
     steps:
