@@ -1,0 +1,75 @@
+[project]
+name = "pull-request-statistics"
+version = "0.1.0"
+description = "Tools for gathering and summarising GitHub pull request statistics"
+readme = "README.md"
+requires-python = ">=3.12"
+dependencies = [
+    "importlib-resources>=5.4.0",
+    "requests>=2.32.0",
+    "setuptools>=80.9.0",
+]
+
+[dependency-groups]
+dev = [
+    "build",
+    "coverage~=7.8.0",
+    "pytest~=8.3.5",
+    "pytest-depends",
+    "requests-mock>=1.12.1",
+    "ruff~=0.11.5",
+    "pytest-xdist>=3.8.0",
+]
+
+[project.urls]
+homepage = "https://github.com/Jack-Waller/pull-request-statistics"
+repository = "https://github.com/Jack-Waller/pull-request-statistics"
+
+[build-system]
+requires = ["setuptools>=65"]
+build-backend = "setuptools.build_meta"
+
+[tool.setuptools]
+packages = ["github_client"]
+package-dir = {"github_client" = "src/github_client"}
+
+[tool.ruff]
+line-length = 120
+target-version = "py312"
+
+[tool.pytest.ini_options]
+pythonpath = ["src"]
+addopts = "-n 4 --dist=loadscope"
+
+[tool.ruff.lint]
+select = [
+    "A",        # flake8-builtins
+    "ASYNC",    # flake8-async
+    "ARG",      # flake8-unused-arguments
+    "B",        # flake8-bugbear
+    "C90",      # McCabe Complexity
+    "DTZ",      # flake8-datetimez
+    "E",        # pycodestyle
+    "F",        # Pyflakes
+    "I",        # isort
+    "ICN",      # flake8-import-conventions
+    "N",        # PEP8 Naming
+    "PT",       # flake8-pytest-style
+    "S",        # flake8-bandit
+    "SIM",      # flake8-simplify
+    "TID",      # flake8-tidy-imports
+    "UP",       # pyupgrade
+"W",        # pycodestyle
+]
+ignore = [
+    "S608",     # NRQL queries are constructed as strings by design
+]
+
+[tool.ruff.lint.per-file-ignores]
+"tests/*" = ["S101", "S108"]  # Allow use of assert, /tmp in tests.
+
+[tool.coverage.html]
+directory = "htmlcov"
+
+[tool.coverage.lcov]
+output = "coverage.lcov"
