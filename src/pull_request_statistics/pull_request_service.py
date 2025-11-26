@@ -1,0 +1,467 @@
+"""
+Query helpers for locating pull requests by author, organisation, and date range.
+
+The service wraps GitHub's GraphQL search endpoint to provide two operations:
+counting pull requests and listing their key details for a given author within
+an organisation across a specified date range. Callers can further restrict the
+results to merged pull requests only by enabling the ``merged_only`` flag. It
+also supports searching for pull requests reviewed by a specific user within a
+date range, optionally excluding pull requests authored by the reviewer.
+"""
+
+from __future__ import annotations
+
+from collections.abc import Iterable, Iterator
+from datetime import UTC, date, datetime, time
+
+from github_client.client import GitHubClient
+from pull_request_statistics.errors import PullRequestDataError
+from pull_request_statistics.pull_request_summary import PullRequestSummary
+
+COUNT_QUERY = """
+query ($query: String!) {
+  search(query: $query, type: ISSUE, first: 1) {
+    issueCount
+  }
+}
+"""
+
+LIST_QUERY = """
+query ($query: String!, $pageSize: Int!, $after: String) {
+  search(query: $query, type: ISSUE, first: $pageSize, after: $after) {
+    issueCount
+    pageInfo {
+      hasNextPage
+      endCursor
+    }
+    nodes {
+      ... on PullRequest {
+        number
+        title
+        url
+        createdAt
+        author {
+          login
+        }
+        repository {
+          nameWithOwner
+        }
+      }
+    }
+  }
+}
+"""
+
+REVIEW_COUNT_QUERY = """
+query ($query: String!, $pageSize: Int!, $after: String) {
+  search(query: $query, type: ISSUE, first: $pageSize, after: $after) {
+    pageInfo {
+      hasNextPage
+      endCursor
+    }
+    nodes {
+      ... on PullRequest {
+        author { login }
+        reviews(first: 100) {
+          edges {
+            node {
+              createdAt
+              author { login }
+            }
+          }
+        }
+      }
+    }
+  }
+}
+"""
+
+REVIEW_LIST_QUERY = """
+query ($query: String!, $pageSize: Int!, $after: String) {
+  search(query: $query, type: ISSUE, first: $pageSize, after: $after) {
+    issueCount
+    pageInfo {
+      hasNextPage
+      endCursor
+    }
+    nodes {
+      ... on PullRequest {
+        number
+        title
+        url
+        createdAt
+        author {
+          login
+        }
+        repository {
+          nameWithOwner
+        }
+        reviews(first: 100) {
+          edges {
+            node {
+              createdAt
+              author {
+                login
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+}
+"""
+
+
+class PullRequestStatisticsService:
+    """
+    Provide pull request count and listing helpers for authored and reviewed pull requests.
+
+    The service builds GitHub search queries and paginates through results,
+    applying additional client-side filters where GitHub's ``issueCount`` lacks
+    the necessary detail (for example, review timestamps). Use
+    ``merged_only=True`` to focus on merged pull requests; otherwise, both open
+    and closed pull requests are returned. Review helpers fetch review edges to
+    enforce date windows and optional exclusion of self-authored pull requests.
+    """
+
+    def __init__(self, client: GitHubClient, page_size: int = 50) -> None:
+        """
+        Store the GitHub client used for issuing GraphQL queries.
+
+        Args:
+            client: Authenticated GitHub client.
+            page_size: Number of nodes to request per page when listing pull requests.
+
+        Raises:
+            ValueError: when the requested page size is not between 1 and 100.
+        """
+        if not 1 <= page_size <= 100:
+            raise ValueError("page_size must be between 1 and 100 to satisfy GitHub search limits.")
+        self._client = client
+        self._page_size = page_size
+
+    def count_pull_requests_by_author_in_date_range(
+        self,
+        *,
+        author: str,
+        organisation: str,
+        start_date: date,
+        end_date: date,
+        merged_only: bool = False,
+    ) -> int:
+        """
+        Count pull requests raised by an author in an organisation within a date range.
+
+        Args:
+            author: GitHub user login.
+            organisation: GitHub organisation name.
+            start_date: Inclusive lower bound of the date range.
+            end_date: Inclusive upper bound of the date range.
+            merged_only: When true, limit results to merged pull requests.
+
+        Returns:
+            The number of pull requests matching the supplied criteria.
+        """
+        search_query = self._build_search_query(
+            author=author,
+            organisation=organisation,
+            start_date=start_date,
+            end_date=end_date,
+            merged_only=merged_only,
+        )
+        response = self._client.query_graphql(COUNT_QUERY, variables={"query": search_query})
+        search = self._extract_search(response)
+        return self._extract_issue_count(search)
+
+    def iter_pull_requests_by_author_in_date_range(
+        self,
+        *,
+        author: str,
+        organisation: str,
+        start_date: date,
+        end_date: date,
+        merged_only: bool = False,
+    ) -> Iterator[PullRequestSummary]:
+        """
+        Yield pull requests raised by an author in an organisation within a date range.
+
+        The method paginates through all search results and yields each pull
+        request as it is found, ensuring no pull requests are missed when more
+        than one page is returned.
+
+        Args:
+            author: GitHub user login.
+            organisation: GitHub organisation name.
+            start_date: Inclusive lower bound of the date range.
+            end_date: Inclusive upper bound of the date range.
+            merged_only: When true, limit results to merged pull requests.
+
+        Yields:
+            ``PullRequestSummary`` objects describing each pull request.
+        """
+        search_query = self._build_search_query(
+            author=author,
+            organisation=organisation,
+            start_date=start_date,
+            end_date=end_date,
+            merged_only=merged_only,
+        )
+        cursor: str | None = None
+
+        while True:
+            response = self._client.query_graphql(
+                LIST_QUERY,
+                variables={
+                    "query": search_query,
+                    "pageSize": self._page_size,
+                    "after": cursor,
+                },
+            )
+            search = self._extract_search(response)
+            nodes: Iterable[dict] = search.get("nodes") or []
+            for node in nodes:
+                if node is None:
+                    continue
+                yield PullRequestSummary.from_graphql(node)
+
+            page_info = self._extract_page_info(search)
+            if not page_info.get("hasNextPage"):
+                break
+            cursor = page_info["endCursor"]
+
+    def _build_search_query(
+        self,
+        *,
+        author: str,
+        organisation: str,
+        start_date: date,
+        end_date: date,
+        merged_only: bool = False,
+    ) -> str:
+        """Compose a GitHub search query string for the requested filters."""
+        start_datetime, end_datetime = self._normalise_date_range(start_date, end_date)
+
+        start_text = start_datetime.strftime("%Y-%m-%dT%H:%M:%SZ")
+        end_text = end_datetime.strftime("%Y-%m-%dT%H:%M:%SZ")
+        created_range = f"{start_text}..{end_text}"
+        merged_filter = " is:merged" if merged_only else ""
+        return f"author:{author} org:{organisation} is:pr created:{created_range}{merged_filter}"
+
+    def count_pull_requests_reviewed_by_user_in_date_range(
+        self,
+        *,
+        reviewer: str,
+        organisation: str,
+        start_date: date,
+        end_date: date,
+        exclude_self_authored: bool = False,
+    ) -> int:
+        """
+        Count pull requests reviewed by a user in an organisation within a date range.
+
+        Args:
+            reviewer: GitHub user login of the reviewer.
+            organisation: GitHub organisation name.
+            start_date: Inclusive lower bound of the date range (based on PR updates).
+            end_date: Inclusive upper bound of the date range (based on PR updates).
+            exclude_self_authored: When true, exclude pull requests authored by the reviewer.
+
+        Returns:
+            The number of pull requests matching the supplied criteria.
+
+        Note:
+            GitHub's search API does not expose review timestamps inside
+            ``issueCount``. The method issues a dedicated review query and
+            paginates review edges client-side to honour review date windows and
+            optional self-author exclusion. This is necessary to avoid counting
+            reviews that occurred outside the requested period.
+        """
+        search_query = self._build_review_search_query(
+            reviewer=reviewer,
+            organisation=organisation,
+            start_date=start_date,
+            end_date=end_date,
+            exclude_self_authored=exclude_self_authored,
+        )
+        cursor: str | None = None
+        start_datetime, end_datetime = self._normalise_date_range(start_date, end_date)
+        total = 0
+
+        while True:
+            response = self._client.query_graphql(
+                REVIEW_COUNT_QUERY,
+                variables={
+                    "query": search_query,
+                    "pageSize": self._page_size,
+                    "after": cursor,
+                },
+            )
+            search = self._extract_search(response)
+            nodes: Iterable[dict] = search.get("nodes") or []
+            for node in nodes:
+                if node is None:
+                    continue
+                if exclude_self_authored and node.get("author", {}).get("login") == reviewer:
+                    continue
+                if self._has_review_in_range(
+                    reviews=node.get("reviews"),
+                    reviewer=reviewer,
+                    start_datetime=start_datetime,
+                    end_datetime=end_datetime,
+                ):
+                    total += 1
+
+            page_info = self._extract_page_info(search)
+            if not page_info.get("hasNextPage"):
+                break
+            cursor = page_info["endCursor"]
+
+        return total
+
+    def iter_pull_requests_reviewed_by_user_in_date_range(
+        self,
+        *,
+        reviewer: str,
+        organisation: str,
+        start_date: date,
+        end_date: date,
+        exclude_self_authored: bool = False,
+    ) -> Iterator[PullRequestSummary]:
+        """
+        Yield pull requests reviewed by a user in an organisation within a date range.
+
+        The method paginates through review edges and yields each pull request
+        when at least one review by ``reviewer`` falls inside the requested
+        date window. GitHub search does not surface review timestamps in
+        ``issueCount``, so this iterator inspects review edges directly.
+
+        Args:
+            reviewer: GitHub user login of the reviewer.
+            organisation: GitHub organisation name.
+            start_date: Inclusive lower bound of the date range (based on PR updates).
+            end_date: Inclusive upper bound of the date range (based on PR updates).
+            exclude_self_authored: When true, exclude pull requests authored by the reviewer.
+
+        Yields:
+            ``PullRequestSummary`` objects describing each pull request.
+        """
+        search_query = self._build_review_search_query(
+            reviewer=reviewer,
+            organisation=organisation,
+            start_date=start_date,
+            end_date=end_date,
+            exclude_self_authored=exclude_self_authored,
+        )
+        cursor: str | None = None
+
+        start_datetime = datetime.combine(start_date, time.min, tzinfo=UTC)
+        end_datetime = datetime.combine(end_date, time(hour=23, minute=59, second=59), tzinfo=UTC)
+
+        while True:
+            response = self._client.query_graphql(
+                REVIEW_LIST_QUERY,
+                variables={
+                    "query": search_query,
+                    "pageSize": self._page_size,
+                    "after": cursor,
+                },
+            )
+            search = response["search"]
+            nodes: Iterable[dict] = search.get("nodes") or []
+            for node in nodes:
+                if node is None:
+                    continue
+                if exclude_self_authored and node.get("author", {}).get("login") == reviewer:
+                    continue
+                if not self._has_review_in_range(
+                    reviews=node.get("reviews"),
+                    reviewer=reviewer,
+                    start_datetime=start_datetime,
+                    end_datetime=end_datetime,
+                ):
+                    continue
+                yield PullRequestSummary.from_graphql(node)
+
+            page_info = search["pageInfo"]
+            if not page_info["hasNextPage"]:
+                break
+            cursor = page_info["endCursor"]
+
+    def _build_review_search_query(
+        self,
+        *,
+        reviewer: str,
+        organisation: str,
+        start_date: date,
+        end_date: date,
+        exclude_self_authored: bool = False,
+    ) -> str:
+        """Compose a GitHub search query for pull requests reviewed by a user."""
+        start_datetime, end_datetime = self._normalise_date_range(start_date, end_date)
+
+        start_text = start_datetime.strftime("%Y-%m-%dT%H:%M:%SZ")
+        end_text = end_datetime.strftime("%Y-%m-%dT%H:%M:%SZ")
+        updated_range = f"{start_text}..{end_text}"
+        self_filter = f" -author:{reviewer}" if exclude_self_authored else ""
+        return f"reviewed-by:{reviewer} org:{organisation} is:pr updated:{updated_range}{self_filter}"
+
+    @staticmethod
+    def _has_review_in_range(
+        *,
+        reviews: dict | None,
+        reviewer: str,
+        start_datetime: datetime,
+        end_datetime: datetime,
+    ) -> bool:
+        """Return True when a review by ``reviewer`` exists in the given window."""
+        edges = (reviews or {}).get("edges", [])
+        for edge in edges:
+            review_node = edge.get("node")
+            if not review_node:
+                continue
+            if review_node.get("author", {}).get("login") != reviewer:
+                continue
+            created_at = review_node.get("createdAt")
+            if not created_at:
+                continue
+            try:
+                review_time = datetime.fromisoformat(created_at.replace("Z", "+00:00"))
+            except ValueError:
+                continue
+            if start_datetime <= review_time <= end_datetime:
+                return True
+        return False
+
+    @staticmethod
+    def _normalise_date_range(start_date: date, end_date: date) -> tuple[datetime, datetime]:
+        """Validate and convert date bounds into UTC datetime bounds."""
+        if end_date < start_date:
+            raise ValueError("end_date must not be earlier than start_date.")
+        start_datetime = datetime.combine(start_date, time.min, tzinfo=UTC)
+        end_datetime = datetime.combine(end_date, time(hour=23, minute=59, second=59), tzinfo=UTC)
+        return start_datetime, end_datetime
+
+    @staticmethod
+    def _extract_search(response: dict) -> dict:
+        """Safely extract the search block or raise a descriptive error."""
+        search = response.get("search")
+        if search is None:
+            raise PullRequestDataError("GitHub response missing search data")
+        return search
+
+    @staticmethod
+    def _extract_issue_count(search: dict) -> int:
+        """Safely extract issueCount."""
+        issue_count = search.get("issueCount")
+        if issue_count is None:
+            raise PullRequestDataError("GitHub response missing issueCount")
+        return int(issue_count)
+
+    @staticmethod
+    def _extract_page_info(search: dict) -> dict:
+        """Safely extract pageInfo."""
+        page_info = search.get("pageInfo")
+        if page_info is None:
+            raise PullRequestDataError("GitHub response missing pageInfo")
+        return page_info
