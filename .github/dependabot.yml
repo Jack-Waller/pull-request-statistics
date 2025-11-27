@@ -1,11 +1,13 @@
 version: 2
 updates:
-  - package-ecosystem: "pip"
+  - package-ecosystem: "uv"
     directory: "/"
     schedule:
       interval: "weekly"
     groups:
       python-minor-patch:
+        patterns:
+          - "*"
         update-types:
           - "minor"
           - "patch"
@@ -16,6 +18,8 @@ updates:
       interval: "weekly"
     groups:
       actions-minor-patch:
+        patterns:
+          - "*"
         update-types:
           - "minor"
           - "patch"
