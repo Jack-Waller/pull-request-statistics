@@ -6,6 +6,8 @@ updates:
       interval: "weekly"
     groups:
       python-minor-patch:
+        patterns:
+          - "*"
         update-types:
           - "minor"
           - "patch"
@@ -16,6 +18,8 @@ updates:
       interval: "weekly"
     groups:
       actions-minor-patch:
+        patterns:
+          - "*"
         update-types:
           - "minor"
           - "patch"
