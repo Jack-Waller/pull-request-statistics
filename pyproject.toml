@@ -30,7 +30,12 @@ requires = ["setuptools>=65"]
 build-backend = "setuptools.build_meta"
 
 [tool.setuptools]
-packages = ["github_client", "pull_request_statistics"]
+packages = [
+    "github_client",
+    "pull_request_statistics",
+    "pull_request_statistics.date_ranges",
+    "pull_request_statistics.date_ranges.enums",
+]
 package-dir = {"github_client" = "src/github_client", "pull_request_statistics" = "src/pull_request_statistics"}
 
 [tool.ruff]

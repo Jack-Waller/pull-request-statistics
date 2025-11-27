@@ -15,6 +15,7 @@ from collections.abc import Iterable, Iterator
 from datetime import UTC, date, datetime, time
 
 from github_client.client import GitHubClient
+from pull_request_statistics.date_ranges import DateRange, DateRangeFactory, HalfName, MonthName, QuarterName
 from pull_request_statistics.errors import PullRequestDataError
 from pull_request_statistics.pull_request_summary import PullRequestSummary
 
@@ -125,13 +126,19 @@ class PullRequestStatisticsService:
     enforce date windows and optional exclusion of self-authored pull requests.
     """
 
-    def __init__(self, client: GitHubClient, page_size: int = 50) -> None:
+    def __init__(
+        self,
+        client: GitHubClient,
+        page_size: int = 50,
+        date_range_factory: DateRangeFactory | None = None,
+    ) -> None:
         """
         Store the GitHub client used for issuing GraphQL queries.
 
         Args:
             client: Authenticated GitHub client.
             page_size: Number of nodes to request per page when listing pull requests.
+            date_range_factory: Factory for constructing period-based date ranges. Defaults to ``DateRangeFactory()``.
 
         Raises:
             ValueError: when the requested page size is not between 1 and 100.
@@ -140,47 +147,58 @@ class PullRequestStatisticsService:
             raise ValueError("page_size must be between 1 and 100 to satisfy GitHub search limits.")
         self._client = client
         self._page_size = page_size
+        self._date_range_factory = date_range_factory or DateRangeFactory()
 
     def count_pull_requests_by_author_in_date_range(
         self,
         *,
         author: str,
         organisation: str,
-        start_date: date,
-        end_date: date,
+        year: int | None = None,
+        quarter: QuarterName | str | int | None = None,
+        month: MonthName | str | int | None = None,
+        half: HalfName | str | int | None = None,
+        on_date: date | None = None,
         merged_only: bool = False,
-    ) -> int:
+    ) -> tuple[DateRange, int]:
         """
         Count pull requests raised by an author in an organisation within a date range.
 
         Args:
             author: GitHub user login.
             organisation: GitHub organisation name.
-            start_date: Inclusive lower bound of the date range.
-            end_date: Inclusive upper bound of the date range.
+            year: Calendar year to include (optional unless no other period supplied).
+            quarter: Quarter to include. Cannot be combined with ``month`` or ``half``.
+            month: Month to include. Cannot be combined with ``quarter`` or ``half``.
+            half: Half-year to include. Cannot be combined with ``quarter`` or ``month``.
+            on_date: Specific day to include; creates a single-day range and cannot be combined with other periods.
             merged_only: When true, limit results to merged pull requests.
 
         Returns:
-            The number of pull requests matching the supplied criteria.
+            Tuple of the resolved ``DateRange`` and the number of pull requests matching the supplied criteria.
         """
+        date_range = self._resolve_date_range(half=half, month=month, quarter=quarter, year=year, on_date=on_date)
         search_query = self._build_search_query(
             author=author,
             organisation=organisation,
-            start_date=start_date,
-            end_date=end_date,
+            start_date=date_range.start_date,
+            end_date=date_range.end_date,
             merged_only=merged_only,
         )
         response = self._client.query_graphql(COUNT_QUERY, variables={"query": search_query})
         search = self._extract_search(response)
-        return self._extract_issue_count(search)
+        return date_range, self._extract_issue_count(search)
 
     def iter_pull_requests_by_author_in_date_range(
         self,
         *,
         author: str,
         organisation: str,
-        start_date: date,
-        end_date: date,
+        year: int | None = None,
+        quarter: QuarterName | str | int | None = None,
+        month: MonthName | str | int | None = None,
+        half: HalfName | str | int | None = None,
+        on_date: date | None = None,
         merged_only: bool = False,
     ) -> Iterator[PullRequestSummary]:
         """
@@ -193,18 +211,22 @@ class PullRequestStatisticsService:
         Args:
             author: GitHub user login.
             organisation: GitHub organisation name.
-            start_date: Inclusive lower bound of the date range.
-            end_date: Inclusive upper bound of the date range.
+            year: Calendar year to include (optional unless no other period supplied).
+            quarter: Quarter to include. Cannot be combined with ``month`` or ``half``.
+            month: Month to include. Cannot be combined with ``quarter`` or ``half``.
+            half: Half-year to include. Cannot be combined with ``quarter`` or ``month``.
+            on_date: Specific day to include; creates a single-day range and cannot be combined with other periods.
             merged_only: When true, limit results to merged pull requests.
 
         Yields:
             ``PullRequestSummary`` objects describing each pull request.
         """
+        date_range = self._resolve_date_range(half=half, month=month, quarter=quarter, year=year, on_date=on_date)
         search_query = self._build_search_query(
             author=author,
             organisation=organisation,
-            start_date=start_date,
-            end_date=end_date,
+            start_date=date_range.start_date,
+            end_date=date_range.end_date,
             merged_only=merged_only,
         )
         cursor: str | None = None
@@ -253,22 +275,28 @@ class PullRequestStatisticsService:
         *,
         reviewer: str,
         organisation: str,
-        start_date: date,
-        end_date: date,
+        year: int | None = None,
+        quarter: QuarterName | str | int | None = None,
+        month: MonthName | str | int | None = None,
+        half: HalfName | str | int | None = None,
+        on_date: date | None = None,
         exclude_self_authored: bool = False,
-    ) -> int:
+    ) -> tuple[DateRange, int]:
         """
         Count pull requests reviewed by a user in an organisation within a date range.
 
         Args:
             reviewer: GitHub user login of the reviewer.
             organisation: GitHub organisation name.
-            start_date: Inclusive lower bound of the date range (based on PR updates).
-            end_date: Inclusive upper bound of the date range (based on PR updates).
+            year: Calendar year to include (optional unless no other period supplied).
+            quarter: Quarter to include. Cannot be combined with ``month`` or ``half``.
+            month: Month to include. Cannot be combined with ``quarter`` or ``half``.
+            half: Half-year to include. Cannot be combined with ``quarter`` or ``month``.
+            on_date: Specific day to include; creates a single-day range and cannot be combined with other periods.
             exclude_self_authored: When true, exclude pull requests authored by the reviewer.
 
         Returns:
-            The number of pull requests matching the supplied criteria.
+            Tuple of the resolved ``DateRange`` and the number of pull requests matching the supplied criteria.
 
         Note:
             GitHub's search API does not expose review timestamps inside
@@ -277,15 +305,16 @@ class PullRequestStatisticsService:
             optional self-author exclusion. This is necessary to avoid counting
             reviews that occurred outside the requested period.
         """
+        date_range = self._resolve_date_range(half=half, month=month, quarter=quarter, year=year, on_date=on_date)
         search_query = self._build_review_search_query(
             reviewer=reviewer,
             organisation=organisation,
-            start_date=start_date,
-            end_date=end_date,
+            start_date=date_range.start_date,
+            end_date=date_range.end_date,
             exclude_self_authored=exclude_self_authored,
         )
         cursor: str | None = None
-        start_datetime, end_datetime = self._normalise_date_range(start_date, end_date)
+        start_datetime, end_datetime = self._normalise_date_range(date_range.start_date, date_range.end_date)
         total = 0
 
         while True:
@@ -317,15 +346,18 @@ class PullRequestStatisticsService:
                 break
             cursor = page_info["endCursor"]
 
-        return total
+        return date_range, total
 
     def iter_pull_requests_reviewed_by_user_in_date_range(
         self,
         *,
         reviewer: str,
         organisation: str,
-        start_date: date,
-        end_date: date,
+        year: int | None = None,
+        quarter: QuarterName | str | int | None = None,
+        month: MonthName | str | int | None = None,
+        half: HalfName | str | int | None = None,
+        on_date: date | None = None,
         exclude_self_authored: bool = False,
     ) -> Iterator[PullRequestSummary]:
         """
@@ -339,24 +371,28 @@ class PullRequestStatisticsService:
         Args:
             reviewer: GitHub user login of the reviewer.
             organisation: GitHub organisation name.
-            start_date: Inclusive lower bound of the date range (based on PR updates).
-            end_date: Inclusive upper bound of the date range (based on PR updates).
+            year: Calendar year to include (optional unless no other period supplied).
+            quarter: Quarter to include. Cannot be combined with ``month`` or ``half``.
+            month: Month to include. Cannot be combined with ``quarter`` or ``half``.
+            half: Half-year to include. Cannot be combined with ``quarter`` or ``month``.
+            on_date: Specific day to include; creates a single-day range and cannot be combined with other periods.
             exclude_self_authored: When true, exclude pull requests authored by the reviewer.
 
         Yields:
             ``PullRequestSummary`` objects describing each pull request.
         """
+        date_range = self._resolve_date_range(half=half, month=month, quarter=quarter, year=year, on_date=on_date)
         search_query = self._build_review_search_query(
             reviewer=reviewer,
             organisation=organisation,
-            start_date=start_date,
-            end_date=end_date,
+            start_date=date_range.start_date,
+            end_date=date_range.end_date,
             exclude_self_authored=exclude_self_authored,
         )
         cursor: str | None = None
 
-        start_datetime = datetime.combine(start_date, time.min, tzinfo=UTC)
-        end_datetime = datetime.combine(end_date, time(hour=23, minute=59, second=59), tzinfo=UTC)
+        start_datetime = datetime.combine(date_range.start_date, time.min, tzinfo=UTC)
+        end_datetime = datetime.combine(date_range.end_date, time(hour=23, minute=59, second=59), tzinfo=UTC)
 
         while True:
             response = self._client.query_graphql(
@@ -465,3 +501,67 @@ class PullRequestStatisticsService:
         if page_info is None:
             raise PullRequestDataError("GitHub response missing pageInfo")
         return page_info
+
+    def _resolve_date_range(
+        self,
+        *,
+        half: HalfName | str | int | None = None,
+        month: MonthName | str | int | None = None,
+        quarter: QuarterName | str | int | None = None,
+        year: int | None = None,
+        on_date: date | None = None,
+    ) -> DateRange:
+        """Construct a date range from a combination of year and optional period."""
+        half_value, month_value, quarter_value = self._validate_period_inputs(
+            half=half,
+            month=month,
+            quarter=quarter,
+            year=year,
+            on_date=on_date,
+        )
+
+        if on_date is not None:
+            return self._date_range_factory.for_date(on_date)
+
+        if year is None:
+            if half_value is not None:
+                return self._date_range_factory.for_half(half_value)
+            if month_value is not None:
+                return self._date_range_factory.for_month(month_value)
+            if quarter_value is not None:
+                return self._date_range_factory.for_quarter(quarter_value)
+            # Only year provided falls through to for_year
+            raise ValueError("year is required when no month, quarter or half is provided.")  # pragma: no cover
+
+        if half_value is not None:
+            return self._date_range_factory.for_half_in_year(half_value, year)
+        if month_value is not None:
+            return self._date_range_factory.for_month_in_year(month_value, year)
+        if quarter_value is not None:
+            return self._date_range_factory.for_quarter_in_year(quarter_value, year)
+        return self._date_range_factory.for_year(year)
+
+    @staticmethod
+    def _validate_period_inputs(
+        *,
+        half: HalfName | str | int | None,
+        month: MonthName | str | int | None,
+        quarter: QuarterName | str | int | None,
+        year: int | None,
+        on_date: date | None,
+    ) -> tuple[HalfName | None, MonthName | None, QuarterName | None]:
+        """Normalise and validate period selection inputs."""
+        if all(period is None for period in (half, month, quarter, year, on_date)):
+            raise ValueError("At least one of year, quarter, month, half or date is required.")
+
+        if on_date is not None and any(period is not None for period in (half, month, quarter, year)):
+            raise ValueError("date cannot be combined with year, quarter, month, or half.")
+
+        selected_periods = sum(period is not None for period in (half, month, quarter))
+        if selected_periods > 1:
+            raise ValueError("Specify only one of month, quarter or half.")
+
+        half_value = HalfName.from_string(half) if half is not None else None
+        month_value = MonthName.from_string(month) if month is not None else None
+        quarter_value = QuarterName.from_string(quarter) if quarter is not None else None
+        return half_value, month_value, quarter_value

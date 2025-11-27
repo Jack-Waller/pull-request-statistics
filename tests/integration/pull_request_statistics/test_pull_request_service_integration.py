@@ -5,13 +5,18 @@ from datetime import date
 import pytest
 
 from github_client.client import GITHUB_GRAPHQL_ENDPOINT, GitHubClient
+from pull_request_statistics.date_ranges import DateRangeFactory, MonthName
 from pull_request_statistics.pull_request_service import PullRequestStatisticsService
 
 
 @pytest.fixture
 def service() -> PullRequestStatisticsService:
     """Provide a service instance with a dummy GitHub client."""
-    return PullRequestStatisticsService(GitHubClient(access_token="x" * 8), page_size=2)
+    return PullRequestStatisticsService(
+        GitHubClient(access_token="x" * 8),
+        page_size=2,
+        date_range_factory=DateRangeFactory(default_today=date(2024, 12, 31)),
+    )
 
 
 def test_authored_pull_requests_iter_and_count(requests_mock, service):
@@ -45,16 +50,16 @@ def test_authored_pull_requests_iter_and_count(requests_mock, service):
         service.iter_pull_requests_by_author_in_date_range(
             author="octocat",
             organisation="skyscanner",
-            start_date=date(2024, 12, 1),
-            end_date=date(2024, 12, 2),
+            month=MonthName.DECEMBER,
+            year=2024,
             merged_only=False,
         )
     )
-    total = service.count_pull_requests_by_author_in_date_range(
+    _, total = service.count_pull_requests_by_author_in_date_range(
         author="octocat",
         organisation="skyscanner",
-        start_date=date(2024, 12, 1),
-        end_date=date(2024, 12, 2),
+        month=MonthName.DECEMBER,
+        year=2024,
         merged_only=False,
     )
 
@@ -123,19 +128,19 @@ def test_reviewed_pull_requests_iter_and_count(requests_mock, service):
         ],
     )
 
-    count = service.count_pull_requests_reviewed_by_user_in_date_range(
+    _, count = service.count_pull_requests_reviewed_by_user_in_date_range(
         reviewer="octocat",
         organisation="skyscanner",
-        start_date=date(2024, 12, 1),
-        end_date=date(2024, 12, 3),
+        month=MonthName.DECEMBER,
+        year=2024,
         exclude_self_authored=True,
     )
     reviewed = list(
         service.iter_pull_requests_reviewed_by_user_in_date_range(
             reviewer="octocat",
             organisation="skyscanner",
-            start_date=date(2024, 12, 1),
-            end_date=date(2024, 12, 3),
+            month=MonthName.DECEMBER,
+            year=2024,
             exclude_self_authored=True,
         )
     )
