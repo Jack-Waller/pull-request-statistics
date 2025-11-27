@@ -1,6 +1,7 @@
 version: 2
 updates:
   - package-ecosystem: "pip"
+    package-manager: "uv"
     directory: "/"
     schedule:
       interval: "weekly"
