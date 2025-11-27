@@ -5,9 +5,18 @@ updates:
     schedule:
       interval: "weekly"
     groups:
-      python-minor-patch:
+      uv-dev:
         patterns:
           - "*"
+        dependency-type: "development"
+        update-types:
+          - "major"
+          - "minor"
+          - "patch"
+      uv-prod:
+        patterns:
+          - "*"
+        dependency-type: "production"
         update-types:
           - "minor"
           - "patch"
