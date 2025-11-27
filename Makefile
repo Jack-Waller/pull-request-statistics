@@ -14,9 +14,6 @@ lint: install
 test: lint
 	uv run pytest tests
 
-run: install
-	uv run --env-file=.env src/main.py
-
 coverage: install pyproject.toml lint
 	uv run python -m coverage run --source=src -m pytest -n 0 tests
 	uv run python -m coverage html

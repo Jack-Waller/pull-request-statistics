@@ -1,137 +1,137 @@
 """
-Entry point for running pull request statistics tooling from the command line.
+Command-line entry point for pull request statistics.
 
 Environment variables:
     GITHUB_ACCESS_TOKEN: Required. Token with permission to run search queries.
-    GITHUB_AUTHOR: Optional. GitHub login to filter by. Defaults to ``Jack-Waller``.
-    GITHUB_ORGANISATION: Optional. Organisation name. Defaults to ``Skyscanner``.
-    GITHUB_PULL_REQUEST_DATE: Optional. Single date to use for both start and end.
-    GITHUB_PULL_REQUEST_START_DATE: Optional. ISO date for the start of the range.
-    GITHUB_PULL_REQUEST_END_DATE: Optional. ISO date for the end of the range.
-    GITHUB_PULL_REQUEST_MERGED_ONLY: Optional. Set to ``true`` to include only merged PRs.
-    GITHUB_PULL_REQUEST_REVIEW_EXCLUDE_SELF: Optional. Set to ``true`` to exclude reviews on self-authored PRs.
-    GITHUB_PULL_REQUEST_REVIEW_EXCLUDE_SELF: Optional. Set to ``true`` to exclude reviews on self-authored PRs.
 """
 
 from __future__ import annotations
 
-from datetime import UTC, date, datetime, timedelta
+import argparse
+from datetime import UTC, date, datetime
 
 from github_client.client import GitHubClient
+from pull_request_statistics.date_ranges import HalfName, MonthName, QuarterName
 from pull_request_statistics.pull_request_service import PullRequestStatisticsService
 from require_env import require_env
 
 
-def main() -> None:
-    """
-    Execute the console entry point.
+def parse_args() -> argparse.Namespace:
+    parser = argparse.ArgumentParser(description="Gather pull request statistics for authored and reviewed PRs.")
+    parser.add_argument("--author", required=True, help="GitHub login of the author to analyse.")
+    parser.add_argument("--organisation", required=True, help="GitHub organisation to search within.")
+    parser.add_argument("--reviewer", help="GitHub login of the reviewer. Defaults to the author.")
+    parser.add_argument("--merged-only", action="store_true", help="Limit authored results to merged pull requests.")
+    parser.add_argument(
+        "--exclude-self-reviews",
+        action="store_true",
+        help="Exclude reviews on self-authored pull requests when counting reviewed PRs.",
+    )
+    parser.add_argument("--quarter", help="Quarter to search (e.g. Q1).")
+    parser.add_argument("--half", help="Half-year to search (e.g. H1).")
+    parser.add_argument("--month", help="Month name or number (e.g. March or 3).")
+    parser.add_argument("--year", type=int, help="Year to search.")
+    parser.add_argument("--date", dest="on_date", help="Specific date (YYYY-MM-DD) to search.")
+    parser.add_argument("--page-size", type=int, default=50, help="Page size for GitHub search pagination.")
+    parser.add_argument(
+        "--counts-only",
+        action="store_true",
+        help="Only fetch counts; skip fetching full pull request lists for authored and reviewed queries.",
+    )
+    return parser.parse_args()
 
-    The script demonstrates listing and counting pull requests for a given
-    author within an organisation across a date range. Authentication requires a
-    ``GITHUB_ACCESS_TOKEN`` environment variable with permission to run the
-    search queries. When no date inputs are supplied, the default range covers
-    the current calendar quarter. Set ``GITHUB_PULL_REQUEST_MERGED_ONLY`` to
-    ``true`` to restrict results to merged pull requests.
-    """
-    access_token = require_env("GITHUB_ACCESS_TOKEN")
-    author = require_env("GITHUB_AUTHOR", require=False) or "Jack-Waller"
-    organisation = require_env("GITHUB_ORGANISATION", require=False) or "Skyscanner"
+
+def default_periods(args: argparse.Namespace) -> None:
+    """Populate default period values when none were provided."""
+    if any((args.quarter, args.half, args.month, args.year, args.on_date)):
+        return
     today = datetime.now(UTC).date()
-    quarter_index = (today.month - 1) // 3
-    start_month = quarter_index * 3 + 1
-    start_of_quarter = today.replace(month=start_month, day=1)
-    next_quarter_month = start_month + 3
-    next_quarter_year = today.year + 1 if next_quarter_month > 12 else today.year
-    next_quarter_month = ((next_quarter_month - 1) % 12) + 1
-    start_of_next_quarter = start_of_quarter.replace(year=next_quarter_year, month=next_quarter_month, day=1)
-    end_of_quarter = start_of_next_quarter - timedelta(days=1)
-    default_start_date = start_of_quarter.isoformat()
-    default_end_date = end_of_quarter.isoformat()
-    single_date = require_env("GITHUB_PULL_REQUEST_DATE", require=False)
-    start_date_raw = require_env("GITHUB_PULL_REQUEST_START_DATE", require=False) or single_date or default_start_date
-    end_date_raw = require_env("GITHUB_PULL_REQUEST_END_DATE", require=False) or single_date or default_end_date
-    start_date = date.fromisoformat(start_date_raw)
-    end_date = date.fromisoformat(end_date_raw)
-    merged_only = (require_env("GITHUB_PULL_REQUEST_MERGED_ONLY", require=False) or "true").lower() == "true"
-    exclude_self_reviews = (
-        require_env("GITHUB_PULL_REQUEST_REVIEW_EXCLUDE_SELF", require=False) or "true"
-    ).lower() == "true"
+    current_quarter = QuarterName(((today.month - 1) // 3) + 1)
+    args.quarter = current_quarter.name
 
+
+def parse_period_inputs(args: argparse.Namespace) -> dict:
+    """Normalise CLI period inputs into service arguments."""
+    default_periods(args)
+    quarter = QuarterName.from_string(args.quarter) if args.quarter else None
+    half = HalfName.from_string(args.half) if args.half else None
+    month = MonthName.from_string(args.month) if args.month else None
+    on_date = date.fromisoformat(args.on_date) if args.on_date else None
+    return {
+        "quarter": quarter,
+        "half": half,
+        "month": month,
+        "year": args.year,
+        "on_date": on_date,
+    }
+
+
+def main() -> None:
+    args = parse_args()
+    periods = parse_period_inputs(args)
+
+    access_token = require_env("GITHUB_ACCESS_TOKEN")
     client = GitHubClient(access_token=access_token)
-    service = PullRequestStatisticsService(client)
+    service = PullRequestStatisticsService(client, page_size=args.page_size)
 
-    pull_requests = list(
-        service.iter_pull_requests_by_author_in_date_range(
-            author=author,
-            organisation=organisation,
-            start_date=start_date,
-            end_date=end_date,
-            merged_only=merged_only,
+    authored = []
+    if not args.counts_only:
+        authored = list(
+            service.iter_pull_requests_by_author_in_date_range(
+                author=args.author,
+                organisation=args.organisation,
+                merged_only=args.merged_only,
+                **periods,
+            )
         )
-    )
-    count = service.count_pull_requests_by_author_in_date_range(
-        author=author,
-        organisation=organisation,
-        start_date=start_date,
-        end_date=end_date,
-        merged_only=merged_only,
+    authored_range, authored_count = service.count_pull_requests_by_author_in_date_range(
+        author=args.author,
+        organisation=args.organisation,
+        merged_only=args.merged_only,
+        **periods,
     )
 
-    computed_count = len(pull_requests)
+    reviewer = args.reviewer or args.author
+    reviewed = []
+    if not args.counts_only:
+        reviewed = list(
+            service.iter_pull_requests_reviewed_by_user_in_date_range(
+                reviewer=reviewer,
+                organisation=args.organisation,
+                exclude_self_authored=args.exclude_self_reviews,
+                **periods,
+            )
+        )
+    reviewed_range, reviewed_count = service.count_pull_requests_reviewed_by_user_in_date_range(
+        reviewer=reviewer,
+        organisation=args.organisation,
+        exclude_self_authored=args.exclude_self_reviews,
+        **periods,
+    )
+
     print(
         (
-            "Found "
-            f"{count} pull request(s) opened by {author} in {organisation} "
-            f"from {start_date.isoformat()} to {end_date.isoformat()}."
-            f" Retrieved {computed_count} items from pagination."
+            f"Authored PRs for {args.author} in {args.organisation}: {authored_count} "
+            f"from {authored_range.start_date.isoformat()} to {authored_range.end_date.isoformat()} "
+            f"(retrieved {len(authored)}).{' Merged only.' if args.merged_only else ''}"
         ),
         flush=True,
     )
-    if computed_count != count:
-        print(f"Warning: count {count} did not match retrieved items {computed_count}.", flush=True)
-    for pull_request in pull_requests:
-        print(
-            f"- {pull_request.repository} #{pull_request.number}: {pull_request.title} ({pull_request.url})",
-            flush=True,
-        )
+    if not args.counts_only:
+        for pr in authored:
+            print(f"- {pr.repository} #{pr.number}: {pr.title} ({pr.url})", flush=True)
 
-    reviewed_pull_requests = list(
-        service.iter_pull_requests_reviewed_by_user_in_date_range(
-            reviewer=author,
-            organisation=organisation,
-            start_date=start_date,
-            end_date=end_date,
-            exclude_self_authored=exclude_self_reviews,
-        )
-    )
-    reviewed_count = service.count_pull_requests_reviewed_by_user_in_date_range(
-        reviewer=author,
-        organisation=organisation,
-        start_date=start_date,
-        end_date=end_date,
-        exclude_self_authored=exclude_self_reviews,
-    )
-    computed_reviewed_count = len(reviewed_pull_requests)
     print(
         (
-            "Found "
-            f"{reviewed_count} pull request(s) reviewed by {author} in {organisation} "
-            f"from {start_date.isoformat()} to {end_date.isoformat()}."
-            f" Retrieved {computed_reviewed_count} items from pagination."
-            f"{' Excluding self-authored pull requests.' if exclude_self_reviews else ''}"
+            f"Reviewed PRs by {reviewer} in {args.organisation}: {reviewed_count} "
+            f"from {reviewed_range.start_date.isoformat()} to {reviewed_range.end_date.isoformat()} "
+            f"(retrieved {len(reviewed)}).{' Excluding self-authored.' if args.exclude_self_reviews else ''}"
         ),
         flush=True,
     )
-    if computed_reviewed_count != reviewed_count:
-        print(
-            f"Warning: review count {reviewed_count} did not match retrieved items {computed_reviewed_count}.",
-            flush=True,
-        )
-    for pull_request in reviewed_pull_requests:
-        print(
-            f"- REVIEWED {pull_request.repository} #{pull_request.number}: {pull_request.title} ({pull_request.url})",
-            flush=True,
-        )
+    if not args.counts_only:
+        for pr in reviewed:
+            print(f"- REVIEWED {pr.repository} #{pr.number}: {pr.title} ({pr.url})", flush=True)
 
 
 if __name__ == "__main__":
