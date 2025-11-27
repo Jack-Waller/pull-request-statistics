@@ -35,20 +35,37 @@ A Python CLI tool for gathering and summarizing GitHub pull request statistics f
 
 ## Configuration
 
-Create a `.env` file in the project root with your GitHub access token:
+Set the `GITHUB_ACCESS_TOKEN` environment variable with your GitHub Personal Access Token:
+
+```bash
+export GITHUB_ACCESS_TOKEN=your_github_token_here
+```
+
+The token must have permissions to run search queries against the target organization.
+
+<details>
+<summary>Using a .env file instead</summary>
+
+If you prefer to store your token in a file, create a `.env` file in the project root:
 
 ```env
 GITHUB_ACCESS_TOKEN=your_github_token_here
 ```
 
-The token must have permissions to run search queries against the target organization.
-
-## Usage
-
-Run the tool using uv with your environment file:
+Then use the `--env-file` flag when running uv:
 
 ```bash
 uv run --env-file=.env src/main.py --author <username> --organisation <org>
+```
+
+</details>
+
+## Usage
+
+Run the tool using uv:
+
+```bash
+uv run src/main.py --author <username> --organisation <org>
 ```
 
 ### Command Line Arguments
@@ -72,22 +89,22 @@ uv run --env-file=.env src/main.py --author <username> --organisation <org>
 
 Get PR statistics for the current quarter:
 ```bash
-uv run --env-file=.env src/main.py --author octocat --organisation github
+uv run src/main.py --author octocat --organisation github
 ```
 
 Get merged PRs only for Q1 2024:
 ```bash
-uv run --env-file=.env src/main.py --author octocat --organisation github --merged-only --quarter Q1 --year 2024
+uv run src/main.py --author octocat --organisation github --merged-only --quarter Q1 --year 2024
 ```
 
 Get review counts for a specific month:
 ```bash
-uv run --env-file=.env src/main.py --author octocat --organisation github --month March --year 2024
+uv run src/main.py --author octocat --organisation github --month March --year 2024
 ```
 
 Get stats for a specific date:
 ```bash
-uv run --env-file=.env src/main.py --author octocat --organisation github --date 2024-03-15
+uv run src/main.py --author octocat --organisation github --date 2024-03-15
 ```
 
 ## Development
