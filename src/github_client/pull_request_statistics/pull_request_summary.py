@@ -10,7 +10,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from datetime import datetime
 
-from pull_request_statistics.errors import PullRequestDataError
+from github_client.errors import MalformedResponseError
 
 
 @dataclass(frozen=True)
@@ -40,7 +40,7 @@ class PullRequestSummary:
         Build a summary object from a GraphQL node.
 
         Raises:
-            PullRequestDataError: when expected fields are missing from the GraphQL response.
+            MalformedResponseError: when expected fields are missing from the GraphQL response.
             ValueError: when the creation timestamp cannot be parsed.
 
         Args:
@@ -51,7 +51,7 @@ class PullRequestSummary:
         """
         created_at_raw = node.get("createdAt")
         if created_at_raw is None:
-            raise PullRequestDataError("Pull request node missing createdAt")
+            raise MalformedResponseError("Pull request node missing createdAt")
         try:
             created_at = datetime.fromisoformat(created_at_raw.replace("Z", "+00:00"))
         except ValueError as parse_error:
@@ -61,12 +61,12 @@ class PullRequestSummary:
         repository = node.get("repository") or {}
         name_with_owner = repository.get("nameWithOwner")
         if name_with_owner is None:
-            raise PullRequestDataError("Pull request node missing repository.nameWithOwner")
+            raise MalformedResponseError("Pull request node missing repository.nameWithOwner")
         number = node.get("number")
         title = node.get("title")
         url = node.get("url")
         if number is None or title is None or url is None:
-            raise PullRequestDataError("Pull request node missing required fields")
+            raise MalformedResponseError("Pull request node missing required fields")
         return PullRequestSummary(
             number=number,
             title=title,

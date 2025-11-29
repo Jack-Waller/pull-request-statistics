@@ -15,9 +15,15 @@ from collections.abc import Iterable, Iterator
 from datetime import UTC, date, datetime, time
 
 from github_client.client import GitHubClient
-from pull_request_statistics.date_ranges import DateRange, DateRangeFactory, HalfName, MonthName, QuarterName
-from pull_request_statistics.errors import PullRequestDataError
-from pull_request_statistics.pull_request_summary import PullRequestSummary
+from github_client.errors import MalformedResponseError
+from github_client.pull_request_statistics.date_ranges import (
+    DateRange,
+    DateRangeFactory,
+    HalfName,
+    MonthName,
+    QuarterName,
+)
+from github_client.pull_request_statistics.pull_request_summary import PullRequestSummary
 
 COUNT_QUERY = """
 query ($query: String!) {
@@ -159,6 +165,7 @@ class PullRequestStatisticsService:
         month: MonthName | str | int | None = None,
         half: HalfName | str | int | None = None,
         on_date: date | None = None,
+        week: bool = False,
         merged_only: bool = False,
     ) -> tuple[DateRange, int]:
         """
@@ -172,12 +179,15 @@ class PullRequestStatisticsService:
             month: Month to include. Cannot be combined with ``quarter`` or ``half``.
             half: Half-year to include. Cannot be combined with ``quarter`` or ``month``.
             on_date: Specific day to include; creates a single-day range and cannot be combined with other periods.
+            week: When true, use the most recent week ending today. Cannot be combined with other periods.
             merged_only: When true, limit results to merged pull requests.
 
         Returns:
             Tuple of the resolved ``DateRange`` and the number of pull requests matching the supplied criteria.
         """
-        date_range = self._resolve_date_range(half=half, month=month, quarter=quarter, year=year, on_date=on_date)
+        date_range = self._resolve_date_range(
+            half=half, month=month, quarter=quarter, year=year, on_date=on_date, week=week
+        )
         search_query = self._build_search_query(
             author=author,
             organisation=organisation,
@@ -199,6 +209,7 @@ class PullRequestStatisticsService:
         month: MonthName | str | int | None = None,
         half: HalfName | str | int | None = None,
         on_date: date | None = None,
+        week: bool = False,
         merged_only: bool = False,
     ) -> Iterator[PullRequestSummary]:
         """
@@ -216,12 +227,15 @@ class PullRequestStatisticsService:
             month: Month to include. Cannot be combined with ``quarter`` or ``half``.
             half: Half-year to include. Cannot be combined with ``quarter`` or ``month``.
             on_date: Specific day to include; creates a single-day range and cannot be combined with other periods.
+            week: When true, use the most recent week ending today. Cannot be combined with other periods.
             merged_only: When true, limit results to merged pull requests.
 
         Yields:
             ``PullRequestSummary`` objects describing each pull request.
         """
-        date_range = self._resolve_date_range(half=half, month=month, quarter=quarter, year=year, on_date=on_date)
+        date_range = self._resolve_date_range(
+            half=half, month=month, quarter=quarter, year=year, on_date=on_date, week=week
+        )
         search_query = self._build_search_query(
             author=author,
             organisation=organisation,
@@ -280,6 +294,7 @@ class PullRequestStatisticsService:
         month: MonthName | str | int | None = None,
         half: HalfName | str | int | None = None,
         on_date: date | None = None,
+        week: bool = False,
         exclude_self_authored: bool = False,
     ) -> tuple[DateRange, int]:
         """
@@ -293,6 +308,7 @@ class PullRequestStatisticsService:
             month: Month to include. Cannot be combined with ``quarter`` or ``half``.
             half: Half-year to include. Cannot be combined with ``quarter`` or ``month``.
             on_date: Specific day to include; creates a single-day range and cannot be combined with other periods.
+            week: When true, use the most recent week ending today. Cannot be combined with other periods.
             exclude_self_authored: When true, exclude pull requests authored by the reviewer.
 
         Returns:
@@ -305,7 +321,9 @@ class PullRequestStatisticsService:
             optional self-author exclusion. This is necessary to avoid counting
             reviews that occurred outside the requested period.
         """
-        date_range = self._resolve_date_range(half=half, month=month, quarter=quarter, year=year, on_date=on_date)
+        date_range = self._resolve_date_range(
+            half=half, month=month, quarter=quarter, year=year, on_date=on_date, week=week
+        )
         search_query = self._build_review_search_query(
             reviewer=reviewer,
             organisation=organisation,
@@ -358,6 +376,7 @@ class PullRequestStatisticsService:
         month: MonthName | str | int | None = None,
         half: HalfName | str | int | None = None,
         on_date: date | None = None,
+        week: bool = False,
         exclude_self_authored: bool = False,
     ) -> Iterator[PullRequestSummary]:
         """
@@ -376,12 +395,15 @@ class PullRequestStatisticsService:
             month: Month to include. Cannot be combined with ``quarter`` or ``half``.
             half: Half-year to include. Cannot be combined with ``quarter`` or ``month``.
             on_date: Specific day to include; creates a single-day range and cannot be combined with other periods.
+            week: When true, use the most recent week ending today. Cannot be combined with other periods.
             exclude_self_authored: When true, exclude pull requests authored by the reviewer.
 
         Yields:
             ``PullRequestSummary`` objects describing each pull request.
         """
-        date_range = self._resolve_date_range(half=half, month=month, quarter=quarter, year=year, on_date=on_date)
+        date_range = self._resolve_date_range(
+            half=half, month=month, quarter=quarter, year=year, on_date=on_date, week=week
+        )
         search_query = self._build_review_search_query(
             reviewer=reviewer,
             organisation=organisation,
@@ -483,7 +505,7 @@ class PullRequestStatisticsService:
         """Safely extract the search block or raise a descriptive error."""
         search = response.get("search")
         if search is None:
-            raise PullRequestDataError("GitHub response missing search data")
+            raise MalformedResponseError("GitHub response missing search data")
         return search
 
     @staticmethod
@@ -491,7 +513,7 @@ class PullRequestStatisticsService:
         """Safely extract issueCount."""
         issue_count = search.get("issueCount")
         if issue_count is None:
-            raise PullRequestDataError("GitHub response missing issueCount")
+            raise MalformedResponseError("GitHub response missing issueCount")
         return int(issue_count)
 
     @staticmethod
@@ -499,7 +521,7 @@ class PullRequestStatisticsService:
         """Safely extract pageInfo."""
         page_info = search.get("pageInfo")
         if page_info is None:
-            raise PullRequestDataError("GitHub response missing pageInfo")
+            raise MalformedResponseError("GitHub response missing pageInfo")
         return page_info
 
     def _resolve_date_range(
@@ -510,15 +532,20 @@ class PullRequestStatisticsService:
         quarter: QuarterName | str | int | None = None,
         year: int | None = None,
         on_date: date | None = None,
+        week: bool = False,
     ) -> DateRange:
         """Construct a date range from a combination of year and optional period."""
-        half_value, month_value, quarter_value = self._validate_period_inputs(
+        half_value, month_value, quarter_value, week_flag = self._validate_period_inputs(
             half=half,
             month=month,
             quarter=quarter,
             year=year,
             on_date=on_date,
+            week=week,
         )
+
+        if week_flag:
+            return self._date_range_factory.for_week()
 
         if on_date is not None:
             return self._date_range_factory.for_date(on_date)
@@ -549,13 +576,17 @@ class PullRequestStatisticsService:
         quarter: QuarterName | str | int | None,
         year: int | None,
         on_date: date | None,
-    ) -> tuple[HalfName | None, MonthName | None, QuarterName | None]:
+        week: bool,
+    ) -> tuple[HalfName | None, MonthName | None, QuarterName | None, bool]:
         """Normalise and validate period selection inputs."""
-        if all(period is None for period in (half, month, quarter, year, on_date)):
-            raise ValueError("At least one of year, quarter, month, half or date is required.")
+        if all(period is None for period in (half, month, quarter, year, on_date)) and not week:
+            raise ValueError("At least one of year, quarter, month, half, week or date is required.")
 
-        if on_date is not None and any(period is not None for period in (half, month, quarter, year)):
-            raise ValueError("date cannot be combined with year, quarter, month, or half.")
+        if on_date is not None and (any(period is not None for period in (half, month, quarter, year)) or week):
+            raise ValueError("date cannot be combined with year, quarter, month, half, or week.")
+
+        if week and any(period is not None for period in (half, month, quarter, year, on_date)):
+            raise ValueError("week cannot be combined with year, quarter, month, half, or date.")
 
         selected_periods = sum(period is not None for period in (half, month, quarter))
         if selected_periods > 1:
@@ -564,4 +595,4 @@ class PullRequestStatisticsService:
         half_value = HalfName.from_string(half) if half is not None else None
         month_value = MonthName.from_string(month) if month is not None else None
         quarter_value = QuarterName.from_string(quarter) if quarter is not None else None
-        return half_value, month_value, quarter_value
+        return half_value, month_value, quarter_value, week

@@ -8,7 +8,7 @@ from github_client.client import (
     GITHUB_GRAPHQL_ENDPOINT,
     GitHubClient,
 )
-from github_client.errors import GitHubClientError
+from github_client.errors import GitHubClientError, MalformedResponseError
 
 
 @pytest.fixture
@@ -63,7 +63,7 @@ def test_query_graphql_raises_on_invalid_json(requests_mock, github_client):
     """Non JSON responses should be rejected with a descriptive error."""
     requests_mock.post(GITHUB_GRAPHQL_ENDPOINT, text="not json", status_code=200)
 
-    with pytest.raises(GitHubClientError):
+    with pytest.raises(MalformedResponseError):
         github_client.query_graphql("query { viewer { login } }")
 
 
@@ -75,7 +75,7 @@ def test_query_graphql_raises_on_graphql_errors(requests_mock, github_client):
         status_code=200,
     )
 
-    with pytest.raises(GitHubClientError):
+    with pytest.raises(MalformedResponseError):
         github_client.query_graphql("query { viewer { login } }")
 
 
@@ -83,7 +83,7 @@ def test_query_graphql_requires_data_field(requests_mock, github_client):
     """The response must contain a ``data`` field for the caller."""
     requests_mock.post(GITHUB_GRAPHQL_ENDPOINT, json={"something": "else"}, status_code=200)
 
-    with pytest.raises(GitHubClientError):
+    with pytest.raises(MalformedResponseError):
         github_client.query_graphql("query { viewer { login } }")
 
 
