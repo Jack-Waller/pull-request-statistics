@@ -5,8 +5,8 @@ from datetime import date
 import pytest
 
 from github_client.client import GITHUB_GRAPHQL_ENDPOINT, GitHubClient
-from pull_request_statistics.date_ranges import DateRangeFactory, MonthName
-from pull_request_statistics.pull_request_service import PullRequestStatisticsService
+from github_client.pull_request_statistics import PullRequestStatisticsService
+from github_client.pull_request_statistics.date_ranges import DateRangeFactory, MonthName
 
 
 @pytest.fixture

@@ -7,5 +7,6 @@ avoid breaking call sites.
 """
 
 from .client import GitHubClient
+from .team_members import TeamMember, TeamMembersService
 
-__all__ = ["GitHubClient"]
+__all__ = ["GitHubClient", "TeamMember", "TeamMembersService"]

@@ -2,7 +2,7 @@ import re
 
 import pytest
 
-from pull_request_statistics.date_ranges.enums.half import HalfName
+from github_client.pull_request_statistics.date_ranges.enums.half import HalfName
 
 
 class TestHalfNameFromString:

@@ -3,12 +3,12 @@
 from __future__ import annotations
 
 import calendar
-from datetime import UTC, date, datetime
+from datetime import UTC, date, datetime, timedelta
 
-from pull_request_statistics.date_ranges.date_range import DateRange
-from pull_request_statistics.date_ranges.enums.half import HalfName
-from pull_request_statistics.date_ranges.enums.month import MonthName
-from pull_request_statistics.date_ranges.enums.quarter import QuarterName
+from github_client.pull_request_statistics.date_ranges.date_range import DateRange
+from github_client.pull_request_statistics.date_ranges.enums.half import HalfName
+from github_client.pull_request_statistics.date_ranges.enums.month import MonthName
+from github_client.pull_request_statistics.date_ranges.enums.quarter import QuarterName
 
 
 class DateRangeFactory:
@@ -190,12 +190,29 @@ class DateRangeFactory:
         Args:
             value: Day to represent.
 
-        Returns:
+            Returns:
             A ``DateRange`` where ``start_date`` and ``end_date`` match ``value``.
         """
         if value > self._resolve_today(None):
             raise ValueError("date must not be in the future.")
         return DateRange(value, value)
+
+    def for_week(self, *, today: date | None = None) -> DateRange:
+        """
+        Return the most recent seven-day window ending on ``today``.
+
+        The range always spans seven inclusive days. When ``today`` is omitted,
+        the factory uses its configured default or the system date.
+
+        Args:
+            today: Override for the current date when computing the week window.
+
+        Returns:
+            Inclusive date range covering the last seven days including ``today``.
+        """
+        end_date = self._resolve_today(today)
+        start_date = end_date - timedelta(days=6)
+        return DateRange(start_date, end_date)
 
     def _resolve_today(self, override: date | None) -> date:
         """Resolve the effective current date using method override, default override, or system clock."""

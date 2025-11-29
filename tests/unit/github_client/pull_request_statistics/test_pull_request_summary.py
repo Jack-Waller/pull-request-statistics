@@ -4,8 +4,8 @@ from datetime import UTC, datetime
 
 import pytest
 
-from pull_request_statistics.errors import PullRequestDataError
-from pull_request_statistics.pull_request_summary import PullRequestSummary
+from github_client.errors import MalformedResponseError
+from github_client.pull_request_statistics.pull_request_summary import PullRequestSummary
 
 
 def test_from_graphql_parses_complete_node():
@@ -65,7 +65,7 @@ def test_from_graphql_raises_on_missing_created_at():
         "repository": {"nameWithOwner": "skyscanner/example"},
     }
 
-    with pytest.raises(PullRequestDataError, match="createdAt"):
+    with pytest.raises(MalformedResponseError, match="createdAt"):
         PullRequestSummary.from_graphql(node)
 
 
@@ -79,7 +79,7 @@ def test_from_graphql_raises_on_missing_repository_name():
         "repository": {},
     }
 
-    with pytest.raises(PullRequestDataError, match="repository"):
+    with pytest.raises(MalformedResponseError, match="repository"):
         PullRequestSummary.from_graphql(node)
 
 
@@ -90,5 +90,5 @@ def test_from_graphql_raises_on_missing_required_fields():
         "repository": {"nameWithOwner": "skyscanner/example"},
     }
 
-    with pytest.raises(PullRequestDataError, match="required fields"):
+    with pytest.raises(MalformedResponseError, match="required fields"):
         PullRequestSummary.from_graphql(node)

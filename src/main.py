@@ -11,8 +11,9 @@ import argparse
 from datetime import UTC, date, datetime
 
 from github_client.client import GitHubClient
-from pull_request_statistics.date_ranges import HalfName, MonthName, QuarterName
-from pull_request_statistics.pull_request_service import PullRequestStatisticsService
+from github_client.pull_request_statistics import PullRequestStatisticsService
+from github_client.pull_request_statistics.date_ranges import HalfName, MonthName, QuarterName
+from github_client.team_members import TeamMembersService
 from require_env import require_env
 
 
@@ -30,6 +31,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--quarter", help="Quarter to search (e.g. Q1).")
     parser.add_argument("--half", help="Half-year to search (e.g. H1).")
     parser.add_argument("--month", help="Month name or number (e.g. March or 3).")
+    parser.add_argument("--week", action="store_true", help="Use the most recent seven days ending today.")
     parser.add_argument("--year", type=int, help="Year to search.")
     parser.add_argument("--date", dest="on_date", help="Specific date (YYYY-MM-DD) to search.")
     parser.add_argument("--page-size", type=int, default=50, help="Page size for GitHub search pagination.")
@@ -38,12 +40,13 @@ def parse_args() -> argparse.Namespace:
         action="store_true",
         help="Only fetch counts; skip fetching full pull request lists for authored and reviewed queries.",
     )
+    parser.add_argument("--team", help="Team slug within the organisation to list members for.")
     return parser.parse_args()
 
 
 def default_periods(args: argparse.Namespace) -> None:
     """Populate default period values when none were provided."""
-    if any((args.quarter, args.half, args.month, args.year, args.on_date)):
+    if any((args.quarter, args.half, args.month, args.year, args.on_date, args.week)):
         return
     today = datetime.now(UTC).date()
     current_quarter = QuarterName(((today.month - 1) // 3) + 1)
@@ -63,6 +66,7 @@ def parse_period_inputs(args: argparse.Namespace) -> dict:
         "month": month,
         "year": args.year,
         "on_date": on_date,
+        "week": args.week,
     }
 
 
@@ -73,6 +77,7 @@ def main() -> None:
     access_token = require_env("GITHUB_ACCESS_TOKEN")
     client = GitHubClient(access_token=access_token)
     service = PullRequestStatisticsService(client, page_size=args.page_size)
+    team_service = TeamMembersService(client, page_size=args.page_size)
 
     authored = []
     if not args.counts_only:
@@ -119,7 +124,7 @@ def main() -> None:
     )
     if not args.counts_only:
         for pr in authored:
-            print(f"- {pr.repository} #{pr.number}: {pr.title} ({pr.url})", flush=True)
+            print(f"- {pr.repository} #{pr.number}: {pr.title} {pr.url}", flush=True)
 
     print(
         (
@@ -131,7 +136,17 @@ def main() -> None:
     )
     if not args.counts_only:
         for pr in reviewed:
-            print(f"- REVIEWED {pr.repository} #{pr.number}: {pr.title} ({pr.url})", flush=True)
+            print(f"- REVIEWED {pr.repository} #{pr.number}: {pr.title} {pr.url}", flush=True)
+
+    if args.team:
+        team_members = team_service.list_team_members(args.organisation, args.team)
+        print(
+            f"Team members for {args.team} in {args.organisation}: {len(team_members)}",
+            flush=True,
+        )
+        for member in team_members:
+            suffix = f" ({member.name})" if member.name else ""
+            print(f"- {member.login}{suffix}", flush=True)
 
 
 if __name__ == "__main__":

@@ -2,7 +2,7 @@ from datetime import UTC, date, datetime
 
 import pytest
 
-from pull_request_statistics.date_ranges import (
+from github_client.pull_request_statistics.date_ranges import (
     DateRange,
     DateRangeFactory,
     HalfName,
@@ -185,6 +185,16 @@ def test_single_date_range_rejects_future_date() -> None:
     factory = DateRangeFactory(default_today=date(2024, 3, 18))
     with pytest.raises(ValueError, match="date must not be in the future"):
         factory.for_date(date(2024, 3, 19))
+
+
+def test_week_range_covers_last_seven_days_inclusive() -> None:
+    factory = DateRangeFactory(default_today=date(2024, 5, 10))
+    assert factory.for_week() == DateRange(start_date=date(2024, 5, 4), end_date=date(2024, 5, 10))
+
+
+def test_week_range_respects_today_override() -> None:
+    factory = DateRangeFactory(default_today=date(2024, 5, 10))
+    assert factory.for_week(today=date(2024, 1, 7)) == DateRange(start_date=date(2024, 1, 1), end_date=date(2024, 1, 7))
 
 
 def test_resolve_today_uses_override_and_system_clock() -> None:

@@ -2,7 +2,7 @@ import re
 
 import pytest
 
-from pull_request_statistics.date_ranges.enums.month import MonthName
+from github_client.pull_request_statistics.date_ranges import MonthName
 
 
 class TestMonthNameFromString:

@@ -2,7 +2,7 @@ import re
 
 import pytest
 
-from pull_request_statistics.date_ranges.enums.quarter import QuarterName
+from github_client.pull_request_statistics.date_ranges.enums.quarter import QuarterName
 
 
 class TestQuarterNameFromString:

@@ -4,10 +4,10 @@ from datetime import UTC, date, datetime
 
 import pytest
 
-from pull_request_statistics.date_ranges import DateRange, HalfName, MonthName, QuarterName
-from pull_request_statistics.errors import PullRequestDataError
-from pull_request_statistics.pull_request_service import REVIEW_COUNT_QUERY
-from pull_request_statistics.pull_request_summary import PullRequestSummary
+from github_client.errors import MalformedResponseError
+from github_client.pull_request_statistics import REVIEW_COUNT_QUERY
+from github_client.pull_request_statistics.date_ranges import DateRange, HalfName, MonthName, QuarterName
+from github_client.pull_request_statistics.pull_request_summary import PullRequestSummary
 
 
 def test_build_search_query_uses_full_range_window(service_with_mocked_client):
@@ -465,11 +465,11 @@ def test_extract_helpers_raise_when_missing_data(service_with_mocked_client):
     """Helper extractors should raise PullRequestDataError when fields are missing."""
     service, _ = service_with_mocked_client(responses=[])
 
-    with pytest.raises(PullRequestDataError, match="search data"):
+    with pytest.raises(MalformedResponseError, match="search data"):
         service._extract_search({})
-    with pytest.raises(PullRequestDataError, match="issueCount"):
+    with pytest.raises(MalformedResponseError, match="issueCount"):
         service._extract_issue_count({})
-    with pytest.raises(PullRequestDataError, match="pageInfo"):
+    with pytest.raises(MalformedResponseError, match="pageInfo"):
         service._extract_page_info({})
 
 
@@ -550,7 +550,7 @@ def test_period_selection_requires_at_least_one_value(service_with_mocked_client
     """At least one period input must be provided."""
     service, _ = service_with_mocked_client(responses=[])
 
-    with pytest.raises(ValueError, match="At least one of year, quarter, month, half or date is required"):
+    with pytest.raises(ValueError, match="At least one of year, quarter, month, half, week or date is required"):
         service.count_pull_requests_by_author_in_date_range(author="octocat", organisation="skyscanner")
 
 
@@ -602,7 +602,7 @@ def test_date_cannot_be_combined_with_other_periods(service_with_mocked_client):
     """Date input must not be combined with additional periods."""
     service, _ = service_with_mocked_client(responses=[])
 
-    with pytest.raises(ValueError, match="date cannot be combined with year, quarter, month, or half"):
+    with pytest.raises(ValueError, match="date cannot be combined with year, quarter, month, half, or week"):
         service.count_pull_requests_by_author_in_date_range(
             author="octocat",
             organisation="skyscanner",
@@ -675,3 +675,30 @@ def test_count_supports_year_only(service_with_mocked_client):
     )
 
     assert date_range == DateRange(start_date=date(2022, 1, 1), end_date=date(2022, 12, 31))
+
+
+def test_count_supports_week_without_other_periods(service_with_mocked_client):
+    """Week flag should use the most recent seven-day window."""
+    service, calls = service_with_mocked_client(responses=[{"search": {"issueCount": 1}}], today=date(2024, 12, 31))
+
+    date_range, _ = service.count_pull_requests_by_author_in_date_range(
+        author="octocat",
+        organisation="skyscanner",
+        week=True,
+    )
+
+    assert date_range == DateRange(start_date=date(2024, 12, 25), end_date=date(2024, 12, 31))
+    assert "created:2024-12-25T00:00:00Z..2024-12-31T23:59:59Z" in calls[0]["variables"]["query"]
+
+
+def test_week_cannot_be_combined_with_other_periods(service_with_mocked_client):
+    """Week input must not be combined with additional period selectors."""
+    service, _ = service_with_mocked_client(responses=[])
+
+    with pytest.raises(ValueError, match="week cannot be combined with year, quarter, month, half, or date"):
+        service.count_pull_requests_by_author_in_date_range(
+            author="octocat",
+            organisation="skyscanner",
+            week=True,
+            year=2024,
+        )

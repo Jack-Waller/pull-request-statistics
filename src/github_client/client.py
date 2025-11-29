@@ -14,7 +14,7 @@ from urllib.parse import urljoin
 
 import requests
 
-from github_client.errors import GitHubClientError
+from github_client.errors import GitHubClientError, MalformedResponseError
 
 GITHUB_API_BASE_URL = "https://api.github.com"
 GITHUB_GRAPHQL_PATH = "/graphql"
@@ -61,8 +61,9 @@ class GitHubClient:
             The ``data`` payload returned by GitHub.
 
         Raises:
-            GitHubClientError: When the request cannot be issued or the response
-                body does not match GitHub's documented structure.
+            GitHubClientError: When the request cannot be issued.
+            MalformedResponseError: When the response body does not match
+                GitHub's documented structure.
         """
         payload: dict[str, Any] = {"query": query}
         if variables:
@@ -86,12 +87,12 @@ class GitHubClient:
         try:
             response_json = response.json()
         except ValueError as decode_error:
-            raise GitHubClientError("GitHub GraphQL response was not valid JSON") from decode_error
+            raise MalformedResponseError("GitHub GraphQL response was not valid JSON") from decode_error
 
         if "errors" in response_json:
-            raise GitHubClientError(f"GitHub GraphQL returned errors: {response_json['errors']}")
+            raise MalformedResponseError(f"GitHub GraphQL returned errors: {response_json['errors']}")
 
         if "data" not in response_json:
-            raise GitHubClientError("GitHub GraphQL response did not contain data")
+            raise MalformedResponseError("GitHub GraphQL response did not contain data")
 
         return response_json["data"]
