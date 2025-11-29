@@ -6,9 +6,10 @@ A Python CLI tool for gathering and summarizing GitHub pull request statistics f
 
 - **Authored PRs**: Count and list pull requests created by a specific author
 - **Reviewed PRs**: Count and list pull requests reviewed by a specific user
-- **Flexible Date Ranges**: Filter by year, quarter, half-year, month, or a specific date
+- **Flexible Date Ranges**: Filter by year, quarter, half-year, month, week, or a specific date
 - **Filtering Options**: Limit to merged-only PRs or exclude self-authored reviews
 - **Pagination Support**: Configurable page sizes for efficient API usage
+- **Team Members**: List members of a GitHub team within an organisation
 
 ## Requirements
 
@@ -72,7 +73,7 @@ uv run src/main.py --author <username> --organisation <org>
 
 | Argument | Required | Description |
 |----------|----------|-------------|
-| `--author` | Yes | GitHub login of the author to analyze |
+| `--author` | Yes | GitHub login of the author to analyse |
 | `--organisation` | Yes | GitHub organization to search within |
 | `--reviewer` | No | GitHub login of the reviewer (defaults to author) |
 | `--merged-only` | No | Limit authored results to merged pull requests |
@@ -80,10 +81,14 @@ uv run src/main.py --author <username> --organisation <org>
 | `--quarter` | No | Quarter to search (e.g., Q1, Q2, Q3, Q4) |
 | `--half` | No | Half-year to search (e.g., H1, H2) |
 | `--month` | No | Month name or number (e.g., March or 3) |
+| `--week` | No | Use the most recent seven days ending today |
 | `--year` | No | Year to search |
 | `--date` | No | Specific date to search (YYYY-MM-DD) |
 | `--page-size` | No | Page size for GitHub API pagination (default: 50) |
 | `--counts-only` | No | Only fetch counts, skip fetching full PR lists |
+| `--team` | No | Team slug within the organisation to list members for |
+
+If no quarter, half, month, week, year, or date is provided, the tool defaults to the current quarter.
 
 ### Examples
 
@@ -105,6 +110,11 @@ uv run src/main.py --author octocat --organisation github --month March --year 2
 Get stats for a specific date:
 ```bash
 uv run src/main.py --author octocat --organisation github --date 2024-03-15
+```
+
+List team members for a slug within an organisation:
+```bash
+uv run src/main.py --author octocat --organisation github --team mighty-llamas --counts-only
 ```
 
 ## Development
