@@ -176,7 +176,7 @@ def print_team_statistics(
     team_service: TeamMembersService,
 ) -> None:
     team_members = team_service.list_team_members(args.organisation, args.team)
-    rows: list[tuple[str, int, int]] = []
+    rows: list[tuple[str, str, int, int]] = []
     date_range = None
 
     for member in team_members:
@@ -195,7 +195,7 @@ def print_team_statistics(
         if date_range is None:
             date_range = authored_range
         member_display = f"{member.login} ({member.name})" if member.name else member.login
-        rows.append((member_display, authored_count, reviewed_count))
+        rows.append((member.login, member_display, authored_count, reviewed_count))
 
     if date_range:
         start = date_range.start_date.isoformat()
@@ -211,12 +211,45 @@ def print_team_statistics(
         print("- No team members found.", flush=True)
         return
 
-    name_width = max(len("Member"), *(len(name) for name, _, _ in rows))
-    header = f"{'Member':<{name_width}} {'Authored':>10} {'Reviewed':>10}"
+    total_authored = sum(authored for _, _, authored, _ in rows)
+    total_reviewed = sum(reviewed for _, _, _, reviewed in rows)
+
+    name_width = max(len("Member"), *(len(name) for _, name, _, _ in rows))
+    include_review_share = args.exclude_self_reviews
+    if include_review_share:
+        header = f"{'Member':<{name_width}} {'Authored':>10} {'Auth %':>7} {'Reviewed':>10} {'Non-self %':>11}"
+    else:
+        header = f"{'Member':<{name_width}} {'Authored':>10} {'Auth %':>7} {'Reviewed':>10}"
     print(header, flush=True)
     print("-" * len(header), flush=True)
-    for name, authored_count, reviewed_count in rows:
-        print(f"{name:<{name_width}} {authored_count:>10} {reviewed_count:>10}", flush=True)
+    for _, name, authored_count, reviewed_count in rows:
+        authored_share = f"{(authored_count / total_authored) * 100:.1f}%" if total_authored else "n/a"
+        if include_review_share:
+            other_members_authored = total_authored - authored_count
+            reviewable_prs_count = max(other_members_authored, 0)
+            reviewed_share = f"{(reviewed_count / reviewable_prs_count) * 100:.1f}%" if reviewable_prs_count else "n/a"
+            print(
+                f"{name:<{name_width}} {authored_count:>10} {authored_share:>7} "
+                f"{reviewed_count:>10} {reviewed_share:>11}",
+                flush=True,
+            )
+        else:
+            print(
+                f"{name:<{name_width}} {authored_count:>10} {authored_share:>7} {reviewed_count:>10}",
+                flush=True,
+            )
+
+    print("-" * len(header), flush=True)
+    if include_review_share:
+        print(
+            f"{'Team total':<{name_width}} {total_authored:>10} {'100%':>7} {total_reviewed:>10} {'n/a':>11}",
+            flush=True,
+        )
+    else:
+        print(
+            f"{'Team total':<{name_width}} {total_authored:>10} {'100%':>7} {total_reviewed:>10}",
+            flush=True,
+        )
 
 
 def main() -> None:

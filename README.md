@@ -122,6 +122,8 @@ Get per-member counts (authored and reviewed) for a team over the most recent we
 uv run src/main.py --team mighty-llamas --organisation github --week
 ```
 
+When using `--team`, the output includes per-member authored totals, reviewed totals, the percentage of the team's authored PRs each member created, and—when `--exclude-self-reviews` is set—the percentage of other team members' PRs each person reviewed.
+
 ## Development
 
 ### Setup
