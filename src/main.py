@@ -20,10 +20,9 @@ from require_env import require_env
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description="Gather pull request statistics for authored and reviewed PRs.")
     subject_group = parser.add_mutually_exclusive_group(required=True)
-    subject_group.add_argument("--author", help="GitHub login of the author to analyse.")
+    subject_group.add_argument("--user", help="GitHub login of the user to analyse for authored and reviewed PRs.")
     subject_group.add_argument("--team", help="Team slug within the organisation to list members for.")
     parser.add_argument("--organisation", required=True, help="GitHub organisation to search within.")
-    parser.add_argument("--reviewer", help="GitHub login of the reviewer. Defaults to the author.")
     parser.add_argument("--merged-only", action="store_true", help="Limit authored results to merged pull requests.")
     parser.add_argument(
         "--exclude-self-reviews",
@@ -43,8 +42,6 @@ def parse_args() -> argparse.Namespace:
         help="Only fetch counts; skip fetching full pull request lists for authored and reviewed queries.",
     )
     args = parser.parse_args()
-    if args.team and args.reviewer:
-        parser.error("--team cannot be combined with --reviewer; team statistics include review counts per member.")
     return args
 
 
@@ -84,14 +81,14 @@ def gather_authored_statistics(
     if not args.counts_only:
         authored = list(
             service.iter_pull_requests_by_author_in_date_range(
-                author=args.author,
+                author=args.user,
                 organisation=args.organisation,
                 merged_only=args.merged_only,
                 **periods,
             )
         )
     authored_range, authored_count = service.count_pull_requests_by_author_in_date_range(
-        author=args.author,
+        author=args.user,
         organisation=args.organisation,
         merged_only=args.merged_only,
         **periods,
@@ -134,7 +131,7 @@ def print_authored_results(
     merged_suffix = " Merged only." if args.merged_only else ""
     print(
         (
-            f"Authored PRs for {args.author} in {args.organisation}: {authored_count} "
+            f"Authored PRs for {args.user} in {args.organisation}: {authored_count} "
             f"from {authored_range.start_date.isoformat()} to {authored_range.end_date.isoformat()} "
             f"(retrieved {len(authored)}).{merged_suffix}"
         ),
@@ -267,7 +264,7 @@ def main() -> None:
         print_team_statistics(args, periods=periods, service=service, team_service=team_service)
         return
 
-    reviewer = args.reviewer or args.author
+    reviewer = args.user
     authored, (authored_range, authored_count) = gather_authored_statistics(args, periods=periods, service=service)
     reviewed, (reviewed_range, reviewed_count) = gather_reviewed_statistics(
         args,
