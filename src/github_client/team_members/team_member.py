@@ -17,7 +17,7 @@ class TeamMember:
     Represent a single team member returned by GitHub.
 
     Attributes:
-        login: The GitHub username for the team member.
+        login: The GitHub login for the team member.
         name: The member's display name when available; ``None`` when omitted.
     """
 

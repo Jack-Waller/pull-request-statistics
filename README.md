@@ -56,7 +56,7 @@ GITHUB_ACCESS_TOKEN=your_github_token_here
 Then use the `--env-file` flag when running uv:
 
 ```bash
-uv run --env-file=.env src/main.py --user <username> --organisation <org>
+uv run --env-file=.env src/main.py --user <login> --organisation <org>
 ```
 
 </details>
@@ -66,7 +66,7 @@ uv run --env-file=.env src/main.py --user <username> --organisation <org>
 Run the tool using uv:
 
 ```bash
-uv run src/main.py --user <username> --organisation <org>
+uv run src/main.py --user <login> --organisation <org>
 ```
 
 ### Command Line Arguments

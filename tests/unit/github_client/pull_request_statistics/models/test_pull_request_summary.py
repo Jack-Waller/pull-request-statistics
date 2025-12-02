@@ -5,7 +5,7 @@ from datetime import UTC, datetime
 import pytest
 
 from github_client.errors import MalformedResponseError
-from github_client.pull_request_statistics.pull_request_summary import PullRequestSummary
+from github_client.pull_request_statistics.models import PullRequestSummary
 
 
 def test_from_graphql_parses_complete_node():
