@@ -225,8 +225,9 @@ def print_team_statistics(
     for _, name, authored_count, reviewed_count in rows:
         authored_share = f"{(authored_count / total_authored) * 100:.1f}%" if total_authored else "n/a"
         if include_review_share:
-            non_self_denom = max(total_authored - authored_count, 0)
-            reviewed_share = f"{(reviewed_count / non_self_denom) * 100:.1f}%" if non_self_denom else "n/a"
+            other_members_authored = total_authored - authored_count
+            reviewable_prs_count = max(other_members_authored, 0)
+            reviewed_share = f"{(reviewed_count / reviewable_prs_count) * 100:.1f}%" if reviewable_prs_count else "n/a"
             print(
                 f"{name:<{name_width}} {authored_count:>10} {authored_share:>7} "
                 f"{reviewed_count:>10} {reviewed_share:>11}",
