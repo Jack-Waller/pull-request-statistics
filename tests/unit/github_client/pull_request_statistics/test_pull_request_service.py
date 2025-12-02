@@ -15,7 +15,6 @@ def test_build_search_query_uses_full_range_window(service_with_mocked_client):
     service, _ = service_with_mocked_client(responses=[])
     search_query = service._build_search_query(
         author="octocat",
-        organisation="skyscanner",
         start_date=date(2024, 12, 1),
         end_date=date(2024, 12, 3),
     )
@@ -29,7 +28,6 @@ def test_build_search_query_can_include_merged_filter(service_with_mocked_client
 
     search_query = service._build_search_query(
         author="octocat",
-        organisation="skyscanner",
         start_date=date(2024, 12, 1),
         end_date=date(2024, 12, 3),
         merged_only=True,
@@ -44,7 +42,6 @@ def test_count_pull_requests_returns_issue_count(service_with_mocked_client):
 
     date_range, result = service.count_pull_requests_by_author_in_date_range(
         author="octocat",
-        organisation="skyscanner",
         month=MonthName.DECEMBER,
         year=2024,
     )
@@ -77,7 +74,6 @@ def test_list_pull_requests_returns_parsed_summaries(service_with_mocked_client)
     summaries = list(
         service.iter_pull_requests_by_author_in_date_range(
             author="octocat",
-            organisation="skyscanner",
             month=MonthName.DECEMBER,
             year=2024,
         )
@@ -143,7 +139,6 @@ def test_list_pull_requests_paginates_until_complete(service_with_mocked_client)
     summaries = list(
         service.iter_pull_requests_by_author_in_date_range(
             author="octocat",
-            organisation="skyscanner",
             month=MonthName.DECEMBER,
             year=2024,
         )
@@ -186,7 +181,6 @@ def test_count_pull_requests_reviewed_by_user_in_date_range(service_with_mocked_
 
     date_range, result = service.count_pull_requests_reviewed_by_user_in_date_range(
         reviewer="octocat",
-        organisation="skyscanner",
         month=MonthName.DECEMBER,
         year=2024,
     )
@@ -225,7 +219,6 @@ def test_count_pull_requests_reviewed_skips_none_and_self_authored(service_with_
 
     _, count = service.count_pull_requests_reviewed_by_user_in_date_range(
         reviewer="octocat",
-        organisation="skyscanner",
         month=MonthName.DECEMBER,
         year=2024,
         exclude_self_authored=True,
@@ -266,7 +259,6 @@ def test_count_pull_requests_reviewed_handles_pagination(service_with_mocked_cli
 
     _, count = service.count_pull_requests_reviewed_by_user_in_date_range(
         reviewer="octocat",
-        organisation="skyscanner",
         month=MonthName.DECEMBER,
         year=2024,
     )
@@ -309,7 +301,6 @@ def test_iter_pull_requests_reviewed_by_user_excludes_self_authored(service_with
     summaries = list(
         service.iter_pull_requests_reviewed_by_user_in_date_range(
             reviewer="octocat",
-            organisation="skyscanner",
             month=MonthName.DECEMBER,
             year=2024,
             exclude_self_authored=True,
@@ -360,7 +351,6 @@ def test_iter_pull_requests_reviewed_paginates_and_skips_none_nodes(service_with
     summaries = list(
         service.iter_pull_requests_reviewed_by_user_in_date_range(
             reviewer="octocat",
-            organisation="skyscanner",
             month=MonthName.DECEMBER,
             year=2024,
         )
@@ -378,7 +368,6 @@ def test_review_search_rejects_inverted_dates(service_with_mocked_client):
     with pytest.raises(ValueError, match="end_date must not be earlier than start_date"):
         service._build_review_search_query(
             reviewer="octocat",
-            organisation="skyscanner",
             start_date=date(2024, 12, 2),
             end_date=date(2024, 12, 1),
             exclude_self_authored=False,
@@ -418,7 +407,6 @@ def test_iter_pull_requests_reviewed_skips_self_authored_when_requested(service_
     summaries = list(
         service.iter_pull_requests_reviewed_by_user_in_date_range(
             reviewer="octocat",
-            organisation="skyscanner",
             month=MonthName.DECEMBER,
             year=2024,
             exclude_self_authored=True,
@@ -452,7 +440,6 @@ def test_iter_pull_requests_reviewed_ignores_invalid_review_timestamps(service_w
     summaries = list(
         service.iter_pull_requests_reviewed_by_user_in_date_range(
             reviewer="octocat",
-            organisation="skyscanner",
             month=MonthName.DECEMBER,
             year=2024,
         )
@@ -511,7 +498,6 @@ def test_count_member_statistics_returns_counts(service_with_mocked_client):
 
     date_range, statistics = service.count_member_statistics(
         members=["alice", "bob", "alice"],
-        organisation="skyscanner",
         month=MonthName.DECEMBER,
         year=2024,
     )
@@ -531,7 +517,7 @@ def test_count_member_statistics_skips_empty_members(service_with_mocked_client)
     """Empty member list should return no statistics."""
     service, _ = service_with_mocked_client(responses=[])
 
-    date_range, statistics = service.count_member_statistics(members=[], organisation="skyscanner", year=2024)
+    date_range, statistics = service.count_member_statistics(members=[], year=2024)
 
     assert date_range is None
     assert statistics == []
@@ -565,7 +551,6 @@ def test_count_reviewed_respects_exclude_self_authored(service_with_mocked_clien
 
     _, count = service.count_pull_requests_reviewed_by_user_in_date_range(
         reviewer="alice",
-        organisation="skyscanner",
         month=MonthName.DECEMBER,
         year=2024,
         exclude_self_authored=True,
@@ -622,7 +607,6 @@ def test_iter_pull_requests_reviewed_exercises_all_review_filters(service_with_m
     summaries = list(
         service.iter_pull_requests_reviewed_by_user_in_date_range(
             reviewer="octocat",
-            organisation="skyscanner",
             month=MonthName.DECEMBER,
             year=2024,
         )
@@ -633,7 +617,6 @@ def test_iter_pull_requests_reviewed_exercises_all_review_filters(service_with_m
     service, _ = service_with_mocked_client(responses=[response])
     _, count = service.count_pull_requests_reviewed_by_user_in_date_range(
         reviewer="octocat",
-        organisation="skyscanner",
         month=MonthName.DECEMBER,
         year=2024,
     )
@@ -653,7 +636,6 @@ def test_end_date_not_before_start_date(service_with_mocked_client):
     with pytest.raises(ValueError, match="end_date must not be earlier than start_date"):
         service._build_search_query(
             author="octocat",
-            organisation="skyscanner",
             start_date=date(2024, 12, 2),
             end_date=date(2024, 12, 1),
         )
@@ -664,7 +646,7 @@ def test_period_selection_requires_at_least_one_value(service_with_mocked_client
     service, _ = service_with_mocked_client(responses=[])
 
     with pytest.raises(ValueError, match="At least one of year, quarter, month, half, week or date is required"):
-        service.count_pull_requests_by_author_in_date_range(author="octocat", organisation="skyscanner")
+        service.count_pull_requests_by_author_in_date_range(author="octocat")
 
 
 def test_period_selection_rejects_multiple_periods(service_with_mocked_client):
@@ -674,7 +656,6 @@ def test_period_selection_rejects_multiple_periods(service_with_mocked_client):
     with pytest.raises(ValueError, match="Specify only one of month, quarter or half"):
         service.count_pull_requests_by_author_in_date_range(
             author="octocat",
-            organisation="skyscanner",
             month=MonthName.JANUARY,
             quarter=QuarterName.Q1,
             year=2024,
@@ -687,7 +668,6 @@ def test_half_with_year_is_supported(service_with_mocked_client):
 
     date_range, _ = service.count_pull_requests_by_author_in_date_range(
         author="octocat",
-        organisation="skyscanner",
         half=HalfName.H1,
         year=2023,
     )
@@ -702,7 +682,6 @@ def test_single_date_creates_same_day_range(service_with_mocked_client):
 
     date_range, _ = service.count_pull_requests_by_author_in_date_range(
         author="octocat",
-        organisation="skyscanner",
         on_date=date(2024, 12, 5),
     )
 
@@ -718,7 +697,6 @@ def test_date_cannot_be_combined_with_other_periods(service_with_mocked_client):
     with pytest.raises(ValueError, match="date cannot be combined with year, quarter, month, half, or week"):
         service.count_pull_requests_by_author_in_date_range(
             author="octocat",
-            organisation="skyscanner",
             on_date=date(2024, 12, 5),
             year=2024,
         )
@@ -730,7 +708,6 @@ def test_count_supports_half_without_year(service_with_mocked_client):
 
     date_range, _ = service.count_pull_requests_by_author_in_date_range(
         author="octocat",
-        organisation="skyscanner",
         half=HalfName.H2,
     )
 
@@ -743,7 +720,6 @@ def test_count_supports_quarter_without_year(service_with_mocked_client):
 
     date_range, _ = service.count_pull_requests_by_author_in_date_range(
         author="octocat",
-        organisation="skyscanner",
         quarter=QuarterName.Q4,
     )
 
@@ -756,7 +732,6 @@ def test_count_supports_month_without_year(service_with_mocked_client):
 
     date_range, _ = service.count_pull_requests_by_author_in_date_range(
         author="octocat",
-        organisation="skyscanner",
         month=MonthName.DECEMBER,
     )
 
@@ -769,7 +744,6 @@ def test_count_supports_quarter_with_year(service_with_mocked_client):
 
     date_range, _ = service.count_pull_requests_by_author_in_date_range(
         author="octocat",
-        organisation="skyscanner",
         quarter=QuarterName.Q2,
         year=2023,
     )
@@ -783,7 +757,6 @@ def test_count_supports_year_only(service_with_mocked_client):
 
     date_range, _ = service.count_pull_requests_by_author_in_date_range(
         author="octocat",
-        organisation="skyscanner",
         year=2022,
     )
 
@@ -796,7 +769,6 @@ def test_count_supports_week_without_other_periods(service_with_mocked_client):
 
     date_range, _ = service.count_pull_requests_by_author_in_date_range(
         author="octocat",
-        organisation="skyscanner",
         week=True,
     )
 
@@ -811,7 +783,6 @@ def test_week_cannot_be_combined_with_other_periods(service_with_mocked_client):
     with pytest.raises(ValueError, match="week cannot be combined with year, quarter, month, half, or date"):
         service.count_pull_requests_by_author_in_date_range(
             author="octocat",
-            organisation="skyscanner",
             week=True,
             year=2024,
         )

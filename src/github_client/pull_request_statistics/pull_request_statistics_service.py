@@ -135,6 +135,7 @@ class PullRequestStatisticsService:
     def __init__(
         self,
         client: GitHubClient,
+        organisation: str,
         page_size: int = 50,
         date_range_factory: DateRangeFactory | None = None,
     ) -> None:
@@ -143,6 +144,7 @@ class PullRequestStatisticsService:
 
         Args:
             client: Authenticated GitHub client.
+            organisation: GitHub organisation name to search within.
             page_size: Number of nodes to request per page when listing pull requests.
             date_range_factory: Factory for constructing period-based date ranges. Defaults to ``DateRangeFactory()``.
 
@@ -152,6 +154,7 @@ class PullRequestStatisticsService:
         if not 1 <= page_size <= 100:
             raise ValueError("page_size must be between 1 and 100 to satisfy GitHub search limits.")
         self._client = client
+        self._organisation = organisation
         self._page_size = page_size
         self._date_range_factory = date_range_factory or DateRangeFactory()
 
@@ -159,7 +162,6 @@ class PullRequestStatisticsService:
         self,
         *,
         author: str,
-        organisation: str,
         year: int | None = None,
         quarter: QuarterName | str | int | None = None,
         month: MonthName | str | int | None = None,
@@ -173,7 +175,6 @@ class PullRequestStatisticsService:
 
         Args:
             author: GitHub user login.
-            organisation: GitHub organisation name.
             year: Calendar year to include (optional unless no other period supplied).
             quarter: Quarter to include. Cannot be combined with ``month`` or ``half``.
             month: Month to include. Cannot be combined with ``quarter`` or ``half``.
@@ -190,7 +191,6 @@ class PullRequestStatisticsService:
         )
         total = self._count_authored_within_range(
             author=author,
-            organisation=organisation,
             date_range=date_range,
             merged_only=merged_only,
         )
@@ -200,7 +200,6 @@ class PullRequestStatisticsService:
         self,
         *,
         author: str,
-        organisation: str,
         year: int | None = None,
         quarter: QuarterName | str | int | None = None,
         month: MonthName | str | int | None = None,
@@ -218,7 +217,6 @@ class PullRequestStatisticsService:
 
         Args:
             author: GitHub user login.
-            organisation: GitHub organisation name.
             year: Calendar year to include (optional unless no other period supplied).
             quarter: Quarter to include. Cannot be combined with ``month`` or ``half``.
             month: Month to include. Cannot be combined with ``quarter`` or ``half``.
@@ -235,7 +233,6 @@ class PullRequestStatisticsService:
         )
         search_query = self._build_search_query(
             author=author,
-            organisation=organisation,
             start_date=date_range.start_date,
             end_date=date_range.end_date,
             merged_only=merged_only,
@@ -267,7 +264,6 @@ class PullRequestStatisticsService:
         self,
         *,
         author: str,
-        organisation: str,
         start_date: date,
         end_date: date,
         merged_only: bool = False,
@@ -279,13 +275,12 @@ class PullRequestStatisticsService:
         end_text = end_datetime.strftime("%Y-%m-%dT%H:%M:%SZ")
         created_range = f"{start_text}..{end_text}"
         merged_filter = " is:merged" if merged_only else ""
-        return f"author:{author} org:{organisation} is:pr created:{created_range}{merged_filter}"
+        return f"author:{author} org:{self._organisation} is:pr created:{created_range}{merged_filter}"
 
     def count_pull_requests_reviewed_by_user_in_date_range(
         self,
         *,
         reviewer: str,
-        organisation: str,
         year: int | None = None,
         quarter: QuarterName | str | int | None = None,
         month: MonthName | str | int | None = None,
@@ -299,7 +294,6 @@ class PullRequestStatisticsService:
 
         Args:
             reviewer: GitHub user login of the reviewer.
-            organisation: GitHub organisation name.
             year: Calendar year to include (optional unless no other period supplied).
             quarter: Quarter to include. Cannot be combined with ``month`` or ``half``.
             month: Month to include. Cannot be combined with ``quarter`` or ``half``.
@@ -323,7 +317,6 @@ class PullRequestStatisticsService:
         )
         total = self._count_reviewed_within_range(
             reviewer=reviewer,
-            organisation=organisation,
             date_range=date_range,
             exclude_self_authored=exclude_self_authored,
         )
@@ -333,7 +326,6 @@ class PullRequestStatisticsService:
         self,
         *,
         reviewer: str,
-        organisation: str,
         year: int | None = None,
         quarter: QuarterName | str | int | None = None,
         month: MonthName | str | int | None = None,
@@ -352,7 +344,6 @@ class PullRequestStatisticsService:
 
         Args:
             reviewer: GitHub user login of the reviewer.
-            organisation: GitHub organisation name.
             year: Calendar year to include (optional unless no other period supplied).
             quarter: Quarter to include. Cannot be combined with ``month`` or ``half``.
             month: Month to include. Cannot be combined with ``quarter`` or ``half``.
@@ -369,7 +360,6 @@ class PullRequestStatisticsService:
         )
         search_query = self._build_review_search_query(
             reviewer=reviewer,
-            organisation=organisation,
             start_date=date_range.start_date,
             end_date=date_range.end_date,
             exclude_self_authored=exclude_self_authored,
@@ -413,7 +403,6 @@ class PullRequestStatisticsService:
         self,
         *,
         reviewer: str,
-        organisation: str,
         start_date: date,
         end_date: date,
         exclude_self_authored: bool = False,
@@ -425,13 +414,12 @@ class PullRequestStatisticsService:
         end_text = end_datetime.strftime("%Y-%m-%dT%H:%M:%SZ")
         updated_range = f"{start_text}..{end_text}"
         self_filter = f" -author:{reviewer}" if exclude_self_authored else ""
-        return f"reviewed-by:{reviewer} org:{organisation} is:pr updated:{updated_range}{self_filter}"
+        return f"reviewed-by:{reviewer} org:{self._organisation} is:pr updated:{updated_range}{self_filter}"
 
     def count_member_statistics(
         self,
         *,
         members: Iterable[str],
-        organisation: str,
         year: int | None = None,
         quarter: QuarterName | str | int | None = None,
         month: MonthName | str | int | None = None,
@@ -454,13 +442,11 @@ class PullRequestStatisticsService:
         for member in unique_members:
             authored_count = self._count_authored_within_range(
                 author=member,
-                organisation=organisation,
                 date_range=date_range,
                 merged_only=merged_only,
             )
             reviewed_count = self._count_reviewed_within_range(
                 reviewer=member,
-                organisation=organisation,
                 date_range=date_range,
                 exclude_self_authored=exclude_self_authored,
             )
@@ -478,13 +464,11 @@ class PullRequestStatisticsService:
         self,
         *,
         author: str,
-        organisation: str,
         date_range: DateRange,
         merged_only: bool,
     ) -> int:
         search_query = self._build_search_query(
             author=author,
-            organisation=organisation,
             start_date=date_range.start_date,
             end_date=date_range.end_date,
             merged_only=merged_only,
@@ -497,13 +481,11 @@ class PullRequestStatisticsService:
         self,
         *,
         reviewer: str,
-        organisation: str,
         date_range: DateRange,
         exclude_self_authored: bool,
     ) -> int:
         search_query = self._build_review_search_query(
             reviewer=reviewer,
-            organisation=organisation,
             start_date=date_range.start_date,
             end_date=date_range.end_date,
             exclude_self_authored=exclude_self_authored,

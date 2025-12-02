@@ -13,7 +13,12 @@ from github_client.pull_request_statistics.date_ranges import DateRangeFactory
 def service_with_mocked_client(monkeypatch):
     """Provide a factory that returns a service and call log with a mocked GitHub client."""
 
-    def _factory(responses: list[dict], page_size: int = 50, today: date | None = date(2024, 12, 31)):
+    def _factory(
+        responses: list[dict],
+        page_size: int = 50,
+        today: date | None = date(2024, 12, 31),
+        organisation: str = "skyscanner",
+    ):
         client = GitHubClient(access_token="token-" + "x" * 8)
         call_log: list[dict] = []
         date_range_factory = DateRangeFactory(default_today=today)
@@ -25,7 +30,12 @@ def service_with_mocked_client(monkeypatch):
             return responses.pop(0)
 
         monkeypatch.setattr(client, "query_graphql", fake_query_graphql)
-        service = PullRequestStatisticsService(client, page_size=page_size, date_range_factory=date_range_factory)
+        service = PullRequestStatisticsService(
+            client,
+            organisation=organisation,
+            page_size=page_size,
+            date_range_factory=date_range_factory,
+        )
         return service, call_log
 
     return _factory

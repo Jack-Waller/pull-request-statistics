@@ -14,6 +14,7 @@ def service() -> PullRequestStatisticsService:
     """Provide a service instance with a dummy GitHub client."""
     return PullRequestStatisticsService(
         GitHubClient(access_token="x" * 8),
+        organisation="skyscanner",
         page_size=2,
         date_range_factory=DateRangeFactory(default_today=date(2024, 12, 31)),
     )
@@ -49,7 +50,6 @@ def test_authored_pull_requests_iter_and_count(requests_mock, service):
     authored = list(
         service.iter_pull_requests_by_author_in_date_range(
             author="octocat",
-            organisation="skyscanner",
             month=MonthName.DECEMBER,
             year=2024,
             merged_only=False,
@@ -57,7 +57,6 @@ def test_authored_pull_requests_iter_and_count(requests_mock, service):
     )
     _, total = service.count_pull_requests_by_author_in_date_range(
         author="octocat",
-        organisation="skyscanner",
         month=MonthName.DECEMBER,
         year=2024,
         merged_only=False,
@@ -130,7 +129,6 @@ def test_reviewed_pull_requests_iter_and_count(requests_mock, service):
 
     _, count = service.count_pull_requests_reviewed_by_user_in_date_range(
         reviewer="octocat",
-        organisation="skyscanner",
         month=MonthName.DECEMBER,
         year=2024,
         exclude_self_authored=True,
@@ -138,7 +136,6 @@ def test_reviewed_pull_requests_iter_and_count(requests_mock, service):
     reviewed = list(
         service.iter_pull_requests_reviewed_by_user_in_date_range(
             reviewer="octocat",
-            organisation="skyscanner",
             month=MonthName.DECEMBER,
             year=2024,
             exclude_self_authored=True,
