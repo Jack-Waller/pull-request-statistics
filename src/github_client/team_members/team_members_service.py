@@ -114,23 +114,24 @@ class TeamMembersService:
     make troubleshooting API issues straightforward.
     """
 
-    def __init__(self, client: GitHubClient, *, page_size: int = 100) -> None:
+    def __init__(self, client: GitHubClient, organisation: str, *, page_size: int = 100) -> None:
         """
         Create a service that queries the GitHub GraphQL API.
 
         Args:
             client: Authenticated GitHub client instance.
+            organisation: GitHub organisation login to search within.
             page_size: Number of member nodes to fetch per GraphQL request.
         """
         self._client = client
+        self._organisation = organisation
         self._page_size = page_size
 
-    def list_team_members(self, organisation: str, team_slug: str) -> list[TeamMember]:
+    def list_team_members(self, team_slug: str) -> list[TeamMember]:
         """
         Return all members of a GitHub team.
 
         Args:
-            organisation: The organisation login to search within.
             team_slug: The slug of the team to fetch members for.
 
         Returns:
@@ -140,9 +141,9 @@ class TeamMembersService:
             MalformedResponseError: When the GraphQL response is missing expected
                 fields or the organisation or team cannot be found.
         """
-        return list(self.iter_team_members(organisation=organisation, team_slug=team_slug))
+        return list(self.iter_team_members(team_slug=team_slug))
 
-    def iter_team_members(self, organisation: str, team_slug: str) -> Iterator[TeamMember]:
+    def iter_team_members(self, team_slug: str) -> Iterator[TeamMember]:
         """
         Yield members of a team, handling pagination internally.
 
@@ -158,14 +159,14 @@ class TeamMembersService:
             data = self._client.query_graphql(
                 TEAM_MEMBERS_QUERY,
                 variables={
-                    "organisation": organisation,
+                    "organisation": self._organisation,
                     "team": team_slug,
                     "pageSize": self._page_size,
                     "after": cursor,
                 },
             )
 
-            nodes, has_next_page, cursor = _extract_members_page(data, organisation, team_slug)
+            nodes, has_next_page, cursor = _extract_members_page(data, self._organisation, team_slug)
             for node in nodes:
                 yield _build_member(node)
 

@@ -96,7 +96,7 @@ def resolve_members(
     explicit_members = [TeamMember(login=login, name=None) for login in (args.user or [])]
     team_members: list[TeamMember] = []
     if args.team:
-        team_members = team_service.list_team_members(args.organisation, args.team)
+        team_members = team_service.list_team_members(args.team)
     return _merge_members(explicit_members, team_members)
 
 
@@ -112,14 +112,12 @@ def gather_authored_statistics(
         authored = list(
             service.iter_pull_requests_by_author_in_date_range(
                 author=user_login,
-                organisation=args.organisation,
                 merged_only=args.merged_only,
                 **periods,
             )
         )
     authored_range, authored_count = service.count_pull_requests_by_author_in_date_range(
         author=user_login,
-        organisation=args.organisation,
         merged_only=args.merged_only,
         **periods,
     )
@@ -138,14 +136,12 @@ def gather_reviewed_statistics(
         reviewed = list(
             service.iter_pull_requests_reviewed_by_user_in_date_range(
                 reviewer=reviewer,
-                organisation=args.organisation,
                 exclude_self_authored=args.exclude_self_reviews,
                 **periods,
             )
         )
     reviewed_range, reviewed_count = service.count_pull_requests_reviewed_by_user_in_date_range(
         reviewer=reviewer,
-        organisation=args.organisation,
         exclude_self_authored=args.exclude_self_reviews,
         **periods,
     )
@@ -270,8 +266,8 @@ def main() -> None:
 
     access_token = require_env("GITHUB_ACCESS_TOKEN")
     client = GitHubClient(access_token=access_token)
-    service = PullRequestStatisticsService(client, page_size=args.page_size)
-    team_service = TeamMembersService(client, page_size=args.page_size)
+    service = PullRequestStatisticsService(client, organisation=args.organisation, page_size=args.page_size)
+    team_service = TeamMembersService(client, organisation=args.organisation, page_size=args.page_size)
 
     members = resolve_members(args, team_service=team_service)
     if not members:
@@ -289,7 +285,6 @@ def main() -> None:
             label = "specified users"
         date_range, statistics = service.count_member_statistics(
             members=[member.login for member in members],
-            organisation=args.organisation,
             merged_only=args.merged_only,
             exclude_self_authored=args.exclude_self_reviews,
             **periods,

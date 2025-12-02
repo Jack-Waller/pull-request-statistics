@@ -13,7 +13,7 @@ from github_client.team_members import TeamMembersService
 def team_service() -> TeamMembersService:
     """Provide a team member service backed by a dummy GitHub client."""
     client = GitHubClient(access_token=uuid4().hex)
-    return TeamMembersService(client, page_size=2)
+    return TeamMembersService(client, organisation="skyscanner", page_size=2)
 
 
 def test_list_team_members_returns_members(requests_mock, team_service: TeamMembersService) -> None:
@@ -37,7 +37,7 @@ def test_list_team_members_returns_members(requests_mock, team_service: TeamMemb
         },
     )
 
-    members = team_service.list_team_members("skyscanner", "mighty-llamas")
+    members = team_service.list_team_members("mighty-llamas")
 
     assert [member.login for member in members] == ["alice", "bob"]
     assert members[0].name == "Alice Example"
@@ -88,7 +88,7 @@ def test_list_team_members_paginates(requests_mock, team_service: TeamMembersSer
         ],
     )
 
-    members = team_service.list_team_members("skyscanner", "mighty-llamas")
+    members = team_service.list_team_members("mighty-llamas")
 
     assert [member.login for member in members] == ["alice", "bob"]
     assert requests_mock.call_count == 2
@@ -104,7 +104,7 @@ def test_list_team_members_raises_when_team_missing(requests_mock, team_service:
     )
 
     with pytest.raises(MalformedResponseError):
-        team_service.list_team_members("skyscanner", "unknown-team")
+        team_service.list_team_members("unknown-team")
 
 
 def test_iter_team_members_requires_login(requests_mock, team_service: TeamMembersService) -> None:
@@ -126,7 +126,7 @@ def test_iter_team_members_requires_login(requests_mock, team_service: TeamMembe
     )
 
     with pytest.raises(MalformedResponseError):
-        list(team_service.iter_team_members("skyscanner", "mighty-llamas"))
+        list(team_service.iter_team_members("mighty-llamas"))
 
 
 @pytest.mark.parametrize(
@@ -158,7 +158,7 @@ def test_iter_team_members_raises_on_malformed_structures(
     requests_mock.post(GITHUB_GRAPHQL_ENDPOINT, json=response_json)
 
     with pytest.raises(MalformedResponseError, match=message):
-        list(team_service.iter_team_members("skyscanner", "mighty-llamas"))
+        list(team_service.iter_team_members("mighty-llamas"))
 
 
 def test_iter_team_members_requires_cursor_when_more_pages_exist(
@@ -182,4 +182,4 @@ def test_iter_team_members_requires_cursor_when_more_pages_exist(
     )
 
     with pytest.raises(MalformedResponseError, match="cursor"):
-        list(team_service.iter_team_members("skyscanner", "mighty-llamas"))
+        list(team_service.iter_team_members("mighty-llamas"))
