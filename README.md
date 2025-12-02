@@ -66,16 +66,15 @@ uv run --env-file=.env src/main.py --author <username> --organisation <org>
 Run the tool using uv:
 
 ```bash
-uv run src/main.py --author <username> --organisation <org>
+uv run src/main.py --user <username> --organisation <org>
 ```
 
 ### Command Line Arguments
 
 | Argument | Required | Description |
 |----------|----------|-------------|
-| `--author` | Yes (unless `--team` is used) | GitHub login of the author to analyse |
+| `--user` | Yes (unless `--team` is used) | GitHub login to analyse for authored and reviewed PRs |
 | `--organisation` | Yes | GitHub organization to search within |
-| `--reviewer` | No | GitHub login of the reviewer (defaults to author). Cannot be combined with `--team` |
 | `--merged-only` | No | Limit authored results to merged pull requests |
 | `--exclude-self-reviews` | No | Exclude self-authored PRs when counting reviews |
 | `--quarter` | No | Quarter to search (e.g., Q1, Q2, Q3, Q4) |
@@ -94,22 +93,22 @@ If no quarter, half, month, week, year, or date is provided, the tool defaults t
 
 Get PR statistics for the current quarter:
 ```bash
-uv run src/main.py --author octocat --organisation github
+uv run src/main.py --user octocat --organisation github
 ```
 
 Get merged PRs only for Q1 2024:
 ```bash
-uv run src/main.py --author octocat --organisation github --merged-only --quarter Q1 --year 2024
+uv run src/main.py --user octocat --organisation github --merged-only --quarter Q1 --year 2024
 ```
 
 Get review counts for a specific month:
 ```bash
-uv run src/main.py --author octocat --organisation github --month March --year 2024
+uv run src/main.py --user octocat --organisation github --month March --year 2024
 ```
 
 Get stats for a specific date:
 ```bash
-uv run src/main.py --author octocat --organisation github --date 2024-03-15
+uv run src/main.py --user octocat --organisation github --date 2024-03-15
 ```
 
 List team members for a slug within an organisation:
