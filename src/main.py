@@ -82,9 +82,7 @@ def _merge_members(*member_lists: list[TeamMember]) -> list[TeamMember]:
         for member in members:
             key = member.login.lower()
             existing = merged.get(key)
-            if existing is None:
-                merged[key] = member
-            elif not existing.name and member.name:
+            if existing is None or (not existing.name and member.name):
                 merged[key] = member
     return list(merged.values())
 
@@ -155,6 +153,7 @@ def gather_reviewed_statistics(
 
 def print_authored_results(
     args: argparse.Namespace,
+    user_login: str,
     authored: list,
     authored_range: object,
     authored_count: int,
@@ -162,7 +161,7 @@ def print_authored_results(
     merged_suffix = " Merged only." if args.merged_only else ""
     print(
         (
-            f"Authored PRs for {args.user} in {args.organisation}: {authored_count} "
+            f"Authored PRs for {user_login} in {args.organisation}: {authored_count} "
             f"from {authored_range.start_date.isoformat()} to {authored_range.end_date.isoformat()} "
             f"(retrieved {len(authored)}).{merged_suffix}"
         ),
@@ -295,7 +294,7 @@ def main() -> None:
         return
 
     multiple_members = len(members) > 1
-    if args.team or multiple_members or (args.user and len(args.user) > 1):
+    if args.team or multiple_members:
         args.counts_only = True
         if args.team and args.user:
             label = f"team {args.team} and specified users"
@@ -307,10 +306,10 @@ def main() -> None:
         return
 
     single_member = members[0]
-    args.user = single_member.login
-    reviewer = single_member.login
+    user_login = single_member.login
+    reviewer = user_login
     authored, (authored_range, authored_count) = gather_authored_statistics(
-        user_login=single_member.login,
+        user_login=user_login,
         args=args,
         periods=periods,
         service=service,
@@ -321,7 +320,7 @@ def main() -> None:
         periods=periods,
         service=service,
     )
-    print_authored_results(args, authored, authored_range, authored_count)
+    print_authored_results(args, user_login, authored, authored_range, authored_count)
     print_reviewed_results(args, reviewer, reviewed, reviewed_range, reviewed_count)
 
 
