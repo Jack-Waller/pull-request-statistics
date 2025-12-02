@@ -13,6 +13,7 @@ from datetime import UTC, date, datetime
 from github_client.client import GitHubClient
 from github_client.pull_request_statistics import PullRequestStatisticsService
 from github_client.pull_request_statistics.date_ranges import HalfName, MonthName, QuarterName
+from github_client.pull_request_statistics.models import MemberStatistics
 from github_client.team_members import TeamMember, TeamMembersService
 from require_env import require_env
 
@@ -200,29 +201,16 @@ def print_member_statistics(
     *,
     members: list[TeamMember],
     label: str,
-    periods: dict,
-    service: PullRequestStatisticsService,
+    date_range: object | None,
+    statistics: list[MemberStatistics],
 ) -> None:
+    member_lookup = {member.login.lower(): member for member in members}
     rows: list[tuple[str, str, int, int]] = []
-    date_range = None
 
-    for member in members:
-        authored_range, authored_count = service.count_pull_requests_by_author_in_date_range(
-            author=member.login,
-            organisation=args.organisation,
-            merged_only=args.merged_only,
-            **periods,
-        )
-        _, reviewed_count = service.count_pull_requests_reviewed_by_user_in_date_range(
-            reviewer=member.login,
-            organisation=args.organisation,
-            exclude_self_authored=args.exclude_self_reviews,
-            **periods,
-        )
-        if date_range is None:
-            date_range = authored_range
-        member_display = f"{member.login} ({member.name})" if member.name else member.login
-        rows.append((member.login, member_display, authored_count, reviewed_count))
+    for stat in statistics:
+        member = member_lookup.get(stat.login.lower())
+        display_name = f"{stat.login} ({member.name})" if member and member.name else stat.login
+        rows.append((stat.login, display_name, stat.authored_count, stat.reviewed_count))
 
     if date_range:
         start = date_range.start_date.isoformat()
@@ -230,10 +218,7 @@ def print_member_statistics(
         period_text = f" from {start} to {end}"
     else:
         period_text = ""
-    print(
-        f"Pull request counts for {label} in {args.organisation}{period_text}:",
-        flush=True,
-    )
+    print(f"Pull request counts for {label} in {args.organisation}{period_text}:", flush=True)
     if not rows:
         print("- No members found.", flush=True)
         return
@@ -255,11 +240,11 @@ def print_member_statistics(
             other_members_authored = total_authored - authored_count
             reviewable_prs_count = max(other_members_authored, 0)
             reviewed_share = f"{(reviewed_count / reviewable_prs_count) * 100:.1f}%" if reviewable_prs_count else "n/a"
-            print(
+            row_text = (
                 f"{name:<{name_width}} {authored_count:>10} {authored_share:>7} "
-                f"{reviewed_count:>10} {reviewed_share:>11}",
-                flush=True,
+                f"{reviewed_count:>10} {reviewed_share:>11}"
             )
+            print(row_text, flush=True)
         else:
             print(
                 f"{name:<{name_width}} {authored_count:>10} {authored_share:>7} {reviewed_count:>10}",
@@ -302,7 +287,20 @@ def main() -> None:
             label = f"team {args.team}"
         else:
             label = "specified users"
-        print_member_statistics(args, members=members, label=label, periods=periods, service=service)
+        date_range, statistics = service.count_member_statistics(
+            members=[member.login for member in members],
+            organisation=args.organisation,
+            merged_only=args.merged_only,
+            exclude_self_authored=args.exclude_self_reviews,
+            **periods,
+        )
+        print_member_statistics(
+            args,
+            members=members,
+            label=label,
+            date_range=date_range,
+            statistics=statistics,
+        )
         return
 
     single_member = members[0]

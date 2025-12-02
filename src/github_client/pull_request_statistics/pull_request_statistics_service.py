@@ -23,7 +23,7 @@ from github_client.pull_request_statistics.date_ranges import (
     MonthName,
     QuarterName,
 )
-from github_client.pull_request_statistics.pull_request_summary import PullRequestSummary
+from github_client.pull_request_statistics.models import MemberStatistics, PullRequestSummary
 
 COUNT_QUERY = """
 query ($query: String!) {
@@ -188,16 +188,13 @@ class PullRequestStatisticsService:
         date_range = self._resolve_date_range(
             half=half, month=month, quarter=quarter, year=year, on_date=on_date, week=week
         )
-        search_query = self._build_search_query(
+        total = self._count_authored_within_range(
             author=author,
             organisation=organisation,
-            start_date=date_range.start_date,
-            end_date=date_range.end_date,
+            date_range=date_range,
             merged_only=merged_only,
         )
-        response = self._client.query_graphql(COUNT_QUERY, variables={"query": search_query})
-        search = self._extract_search(response)
-        return date_range, self._extract_issue_count(search)
+        return date_range, total
 
     def iter_pull_requests_by_author_in_date_range(
         self,
@@ -324,46 +321,12 @@ class PullRequestStatisticsService:
         date_range = self._resolve_date_range(
             half=half, month=month, quarter=quarter, year=year, on_date=on_date, week=week
         )
-        search_query = self._build_review_search_query(
+        total = self._count_reviewed_within_range(
             reviewer=reviewer,
             organisation=organisation,
-            start_date=date_range.start_date,
-            end_date=date_range.end_date,
+            date_range=date_range,
             exclude_self_authored=exclude_self_authored,
         )
-        cursor: str | None = None
-        start_datetime, end_datetime = self._normalise_date_range(date_range.start_date, date_range.end_date)
-        total = 0
-
-        while True:
-            response = self._client.query_graphql(
-                REVIEW_COUNT_QUERY,
-                variables={
-                    "query": search_query,
-                    "pageSize": self._page_size,
-                    "after": cursor,
-                },
-            )
-            search = self._extract_search(response)
-            nodes: Iterable[dict] = search.get("nodes") or []
-            for node in nodes:
-                if node is None:
-                    continue
-                if exclude_self_authored and node.get("author", {}).get("login") == reviewer:
-                    continue
-                if self._has_review_in_range(
-                    reviews=node.get("reviews"),
-                    reviewer=reviewer,
-                    start_datetime=start_datetime,
-                    end_datetime=end_datetime,
-                ):
-                    total += 1
-
-            page_info = self._extract_page_info(search)
-            if not page_info.get("hasNextPage"):
-                break
-            cursor = page_info["endCursor"]
-
         return date_range, total
 
     def iter_pull_requests_reviewed_by_user_in_date_range(
@@ -463,6 +426,122 @@ class PullRequestStatisticsService:
         updated_range = f"{start_text}..{end_text}"
         self_filter = f" -author:{reviewer}" if exclude_self_authored else ""
         return f"reviewed-by:{reviewer} org:{organisation} is:pr updated:{updated_range}{self_filter}"
+
+    def count_member_statistics(
+        self,
+        *,
+        members: Iterable[str],
+        organisation: str,
+        year: int | None = None,
+        quarter: QuarterName | str | int | None = None,
+        month: MonthName | str | int | None = None,
+        half: HalfName | str | int | None = None,
+        on_date: date | None = None,
+        week: bool = False,
+        merged_only: bool = False,
+        exclude_self_authored: bool = False,
+    ) -> tuple[DateRange | None, list[MemberStatistics]]:
+        """Return authored and reviewed counts for each member in one call."""
+        unique_members = [login for login in dict.fromkeys(members) if login]
+        if not unique_members:
+            return None, []
+
+        date_range = self._resolve_date_range(
+            half=half, month=month, quarter=quarter, year=year, on_date=on_date, week=week
+        )
+        statistics: list[MemberStatistics] = []
+
+        for member in unique_members:
+            authored_count = self._count_authored_within_range(
+                author=member,
+                organisation=organisation,
+                date_range=date_range,
+                merged_only=merged_only,
+            )
+            reviewed_count = self._count_reviewed_within_range(
+                reviewer=member,
+                organisation=organisation,
+                date_range=date_range,
+                exclude_self_authored=exclude_self_authored,
+            )
+            statistics.append(
+                MemberStatistics(
+                    login=member,
+                    authored_count=authored_count,
+                    reviewed_count=reviewed_count,
+                )
+            )
+
+        return date_range, statistics
+
+    def _count_authored_within_range(
+        self,
+        *,
+        author: str,
+        organisation: str,
+        date_range: DateRange,
+        merged_only: bool,
+    ) -> int:
+        search_query = self._build_search_query(
+            author=author,
+            organisation=organisation,
+            start_date=date_range.start_date,
+            end_date=date_range.end_date,
+            merged_only=merged_only,
+        )
+        response = self._client.query_graphql(COUNT_QUERY, variables={"query": search_query})
+        search = self._extract_search(response)
+        return self._extract_issue_count(search)
+
+    def _count_reviewed_within_range(
+        self,
+        *,
+        reviewer: str,
+        organisation: str,
+        date_range: DateRange,
+        exclude_self_authored: bool,
+    ) -> int:
+        search_query = self._build_review_search_query(
+            reviewer=reviewer,
+            organisation=organisation,
+            start_date=date_range.start_date,
+            end_date=date_range.end_date,
+            exclude_self_authored=exclude_self_authored,
+        )
+        cursor: str | None = None
+        start_datetime, end_datetime = self._normalise_date_range(date_range.start_date, date_range.end_date)
+        total = 0
+
+        while True:
+            response = self._client.query_graphql(
+                REVIEW_COUNT_QUERY,
+                variables={
+                    "query": search_query,
+                    "pageSize": self._page_size,
+                    "after": cursor,
+                },
+            )
+            search = self._extract_search(response)
+            nodes: Iterable[dict] = search.get("nodes") or []
+            for node in nodes:
+                if node is None:
+                    continue
+                if exclude_self_authored and node.get("author", {}).get("login") == reviewer:
+                    continue
+                if self._has_review_in_range(
+                    reviews=node.get("reviews"),
+                    reviewer=reviewer,
+                    start_datetime=start_datetime,
+                    end_datetime=end_datetime,
+                ):
+                    total += 1
+
+            page_info = self._extract_page_info(search)
+            if not page_info.get("hasNextPage"):
+                break
+            cursor = page_info["endCursor"]
+
+        return total
 
     @staticmethod
     def _has_review_in_range(

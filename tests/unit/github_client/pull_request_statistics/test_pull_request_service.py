@@ -5,9 +5,9 @@ from datetime import UTC, date, datetime
 import pytest
 
 from github_client.errors import MalformedResponseError
-from github_client.pull_request_statistics import REVIEW_COUNT_QUERY
+from github_client.pull_request_statistics import COUNT_QUERY, REVIEW_COUNT_QUERY
 from github_client.pull_request_statistics.date_ranges import DateRange, HalfName, MonthName, QuarterName
-from github_client.pull_request_statistics.pull_request_summary import PullRequestSummary
+from github_client.pull_request_statistics.models import MemberStatistics, PullRequestSummary
 
 
 def test_build_search_query_uses_full_range_window(service_with_mocked_client):
@@ -459,6 +459,119 @@ def test_iter_pull_requests_reviewed_ignores_invalid_review_timestamps(service_w
     )
 
     assert summaries == []
+
+
+def test_count_member_statistics_returns_counts(service_with_mocked_client):
+    """Member statistics should include authored and reviewed counts for each unique member."""
+    responses = [
+        {"search": {"issueCount": 2}},  # alice authored
+        {
+            "search": {
+                "pageInfo": {"hasNextPage": False, "endCursor": None},
+                "nodes": [
+                    {
+                        "author": {"login": "someone"},
+                        "reviews": {
+                            "edges": [
+                                {
+                                    "node": {
+                                        "createdAt": "2024-12-02T12:30:00Z",
+                                        "author": {"login": "alice"},
+                                    }
+                                }
+                            ]
+                        },
+                    }
+                ],
+            }
+        },
+        {"search": {"issueCount": 1}},  # bob authored
+        {
+            "search": {
+                "pageInfo": {"hasNextPage": False, "endCursor": None},
+                "nodes": [
+                    {
+                        "author": {"login": "another"},
+                        "reviews": {
+                            "edges": [
+                                {
+                                    "node": {
+                                        "createdAt": "2024-12-03T12:30:00Z",
+                                        "author": {"login": "bob"},
+                                    }
+                                }
+                            ]
+                        },
+                    }
+                ],
+            }
+        },
+    ]
+    service, calls = service_with_mocked_client(responses=responses, today=date(2024, 12, 31))
+
+    date_range, statistics = service.count_member_statistics(
+        members=["alice", "bob", "alice"],
+        organisation="skyscanner",
+        month=MonthName.DECEMBER,
+        year=2024,
+    )
+
+    assert date_range == DateRange(start_date=date(2024, 12, 1), end_date=date(2024, 12, 31))
+    assert statistics == [
+        MemberStatistics(login="alice", authored_count=2, reviewed_count=1),
+        MemberStatistics(login="bob", authored_count=1, reviewed_count=1),
+    ]
+    assert calls[0]["query"].strip() == COUNT_QUERY.strip()
+    assert calls[1]["query"].strip() == REVIEW_COUNT_QUERY.strip()
+    assert calls[2]["query"].strip() == COUNT_QUERY.strip()
+    assert calls[3]["query"].strip() == REVIEW_COUNT_QUERY.strip()
+
+
+def test_count_member_statistics_skips_empty_members(service_with_mocked_client):
+    """Empty member list should return no statistics."""
+    service, _ = service_with_mocked_client(responses=[])
+
+    date_range, statistics = service.count_member_statistics(members=[], organisation="skyscanner", year=2024)
+
+    assert date_range is None
+    assert statistics == []
+
+
+def test_count_reviewed_respects_exclude_self_authored(service_with_mocked_client):
+    """Reviewed counting should skip self-authored pull requests when requested."""
+    responses = [
+        {
+            "search": {
+                "pageInfo": {"hasNextPage": False, "endCursor": None},
+                "nodes": [
+                    {
+                        "author": {"login": "alice"},
+                        "reviews": {
+                            "edges": [
+                                {
+                                    "node": {
+                                        "createdAt": "2024-12-02T12:30:00Z",
+                                        "author": {"login": "alice"},
+                                    }
+                                }
+                            ]
+                        },
+                    }
+                ],
+            }
+        }
+    ]
+    service, _ = service_with_mocked_client(responses=responses, today=date(2024, 12, 31))
+
+    _, count = service.count_pull_requests_reviewed_by_user_in_date_range(
+        reviewer="alice",
+        organisation="skyscanner",
+        month=MonthName.DECEMBER,
+        year=2024,
+        exclude_self_authored=True,
+    )
+
+    assert count == 0
 
 
 def test_extract_helpers_raise_when_missing_data(service_with_mocked_client):

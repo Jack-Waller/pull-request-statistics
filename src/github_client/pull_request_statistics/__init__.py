@@ -7,7 +7,7 @@ It supports date range filtering, optional merged-only filtering, and safe
 pagination across all results returned by GitHub's search API.
 """
 
-from github_client.pull_request_statistics.errors import PullRequestDataError
+from github_client.pull_request_statistics.models import MemberStatistics, PullRequestSummary
 from github_client.pull_request_statistics.pull_request_statistics_service import (
     COUNT_QUERY,
     LIST_QUERY,
@@ -15,12 +15,11 @@ from github_client.pull_request_statistics.pull_request_statistics_service impor
     REVIEW_LIST_QUERY,
     PullRequestStatisticsService,
 )
-from github_client.pull_request_statistics.pull_request_summary import PullRequestSummary
 
 __all__ = [
     "PullRequestStatisticsService",
     "PullRequestSummary",
-    "PullRequestDataError",
+    "MemberStatistics",
     "COUNT_QUERY",
     "LIST_QUERY",
     "REVIEW_COUNT_QUERY",
