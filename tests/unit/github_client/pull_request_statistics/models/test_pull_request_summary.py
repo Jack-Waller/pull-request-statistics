@@ -15,7 +15,7 @@ def test_from_graphql_parses_complete_node():
         "title": "Add feature",
         "url": "https://github.com/skyscanner/example/pull/10",
         "createdAt": "2024-01-02T03:04:05Z",
-        "author": {"username": "octocat"},
+        "author": {"login": "octocat"},
         "repository": {"nameWithOwner": "skyscanner/example"},
     }
 
@@ -48,7 +48,7 @@ def test_from_graphql_raises_on_invalid_timestamp():
         "title": "Bad time",
         "url": "https://github.com/skyscanner/example/pull/12",
         "createdAt": "not-a-time",
-        "author": {"username": "octocat"},
+        "author": {"login": "octocat"},
         "repository": {"nameWithOwner": "skyscanner/example"},
     }
 

@@ -19,19 +19,19 @@ def github_client() -> GitHubClient:
 
 def test_query_graphql_returns_data(requests_mock, github_client):
     """Successful responses should return the data payload."""
-    expected_data = {"viewer": {"username": "octocat"}}
+    expected_data = {"viewer": {"login": "octocat"}}
     requests_mock.post(
         GITHUB_GRAPHQL_ENDPOINT,
         json={"data": expected_data},
         status_code=200,
     )
 
-    result = github_client.query_graphql("query { viewer { username } }")
+    result = github_client.query_graphql("query { viewer { login } }")
 
     assert result == expected_data
     last_request = requests_mock.last_request
     assert last_request is not None
-    assert last_request.json() == {"query": "query { viewer { username } }"}
+    assert last_request.json() == {"query": "query { viewer { login } }"}
 
 
 def test_query_graphql_sends_variables(requests_mock, github_client):
@@ -54,7 +54,7 @@ def test_query_graphql_raises_on_http_error(requests_mock, github_client):
     requests_mock.post(GITHUB_GRAPHQL_ENDPOINT, status_code=401, json={"message": "nope"}, reason="Unauthorized")
 
     with pytest.raises(GitHubClientError) as error_info:
-        github_client.query_graphql("query { viewer { username } }")
+        github_client.query_graphql("query { viewer { login } }")
 
     assert "request failed" in str(error_info.value)
 
@@ -64,7 +64,7 @@ def test_query_graphql_raises_on_invalid_json(requests_mock, github_client):
     requests_mock.post(GITHUB_GRAPHQL_ENDPOINT, text="not json", status_code=200)
 
     with pytest.raises(MalformedResponseError):
-        github_client.query_graphql("query { viewer { username } }")
+        github_client.query_graphql("query { viewer { login } }")
 
 
 def test_query_graphql_raises_on_graphql_errors(requests_mock, github_client):
@@ -76,7 +76,7 @@ def test_query_graphql_raises_on_graphql_errors(requests_mock, github_client):
     )
 
     with pytest.raises(MalformedResponseError):
-        github_client.query_graphql("query { viewer { username } }")
+        github_client.query_graphql("query { viewer { login } }")
 
 
 def test_query_graphql_requires_data_field(requests_mock, github_client):
@@ -84,7 +84,7 @@ def test_query_graphql_requires_data_field(requests_mock, github_client):
     requests_mock.post(GITHUB_GRAPHQL_ENDPOINT, json={"something": "else"}, status_code=200)
 
     with pytest.raises(MalformedResponseError):
-        github_client.query_graphql("query { viewer { username } }")
+        github_client.query_graphql("query { viewer { login } }")
 
 
 def test_query_graphql_wraps_transport_errors(requests_mock):
@@ -93,4 +93,4 @@ def test_query_graphql_wraps_transport_errors(requests_mock):
     requests_mock.post(GITHUB_GRAPHQL_ENDPOINT, exc=RuntimeError("boom"))
 
     with pytest.raises(GitHubClientError):
-        client.query_graphql("query { viewer { username } }")
+        client.query_graphql("query { viewer { login } }")

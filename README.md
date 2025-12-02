@@ -56,7 +56,7 @@ GITHUB_ACCESS_TOKEN=your_github_token_here
 Then use the `--env-file` flag when running uv:
 
 ```bash
-uv run --env-file=.env src/main.py --user <username> --organisation <org>
+uv run --env-file=.env src/main.py --user <login> --organisation <org>
 ```
 
 </details>
@@ -66,14 +66,14 @@ uv run --env-file=.env src/main.py --user <username> --organisation <org>
 Run the tool using uv:
 
 ```bash
-uv run src/main.py --user <username> --organisation <org>
+uv run src/main.py --user <login> --organisation <org>
 ```
 
 ### Command Line Arguments
 
 | Argument | Required | Description |
 |----------|----------|-------------|
-| `--user` | Yes (unless `--team` is used) | GitHub username to analyse for authored and reviewed pull requests. Repeat to include multiple users |
+| `--user` | Yes (unless `--team` is used) | GitHub login to analyse for authored and reviewed pull requests. Repeat to include multiple users |
 | `--organisation` | Yes | GitHub organisation to search within |
 | `--merged-only` | No | Limit authored results to merged pull requests |
 | `--exclude-self-reviews` | No | Exclude self-authored pull requests when counting reviews |

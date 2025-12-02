@@ -17,7 +17,7 @@ def team_service() -> TeamMembersService:
 
 
 def test_list_team_members_returns_members(requests_mock, team_service: TeamMembersService) -> None:
-    """Team members should be returned with both username and name data."""
+    """Team members should be returned with both login and name data."""
     requests_mock.post(
         GITHUB_GRAPHQL_ENDPOINT,
         json={
@@ -27,8 +27,8 @@ def test_list_team_members_returns_members(requests_mock, team_service: TeamMemb
                         "members": {
                             "pageInfo": {"hasNextPage": False, "endCursor": None},
                             "nodes": [
-                                {"username": "alice", "name": "Alice Example"},
-                                {"username": "bob", "name": None},
+                                {"login": "alice", "name": "Alice Example"},
+                                {"login": "bob", "name": None},
                             ],
                         }
                     }
@@ -64,7 +64,7 @@ def test_list_team_members_paginates(requests_mock, team_service: TeamMembersSer
                             "team": {
                                 "members": {
                                     "pageInfo": {"hasNextPage": True, "endCursor": "cursor-1"},
-                                    "nodes": [{"username": "alice", "name": None}],
+                                    "nodes": [{"login": "alice", "name": None}],
                                 }
                             }
                         }
@@ -78,7 +78,7 @@ def test_list_team_members_paginates(requests_mock, team_service: TeamMembersSer
                             "team": {
                                 "members": {
                                     "pageInfo": {"hasNextPage": False, "endCursor": None},
-                                    "nodes": [{"username": "bob", "name": "Bob Example"}],
+                                    "nodes": [{"login": "bob", "name": "Bob Example"}],
                                 }
                             }
                         }
@@ -108,7 +108,7 @@ def test_list_team_members_raises_when_team_missing(requests_mock, team_service:
 
 
 def test_iter_team_members_requires_login(requests_mock, team_service: TeamMembersService) -> None:
-    """Each member entry must include a username value."""
+    """Each member entry must include a login value."""
     requests_mock.post(
         GITHUB_GRAPHQL_ENDPOINT,
         json={

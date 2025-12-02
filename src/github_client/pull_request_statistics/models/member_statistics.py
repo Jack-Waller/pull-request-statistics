@@ -7,6 +7,6 @@ from dataclasses import dataclass
 class MemberStatistics:
     """Store authored and reviewed counts for a GitHub user."""
 
-    username: str
+    login: str
     authored_count: int
     reviewed_count: int

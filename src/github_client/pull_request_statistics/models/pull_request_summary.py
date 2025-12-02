@@ -23,7 +23,7 @@ class PullRequestSummary:
         title: Pull request title.
         url: Link to the pull request on GitHub.
         repository: Repository in ``owner/name`` format.
-        author: Author username extracted from the GraphQL node, or ``"unknown"`` when absent.
+        author: Author login extracted from the GraphQL node, or ``"unknown"`` when absent.
         created_at: Datetime when the pull request was created (timezone aware).
     """
 
@@ -72,6 +72,6 @@ class PullRequestSummary:
             title=title,
             url=url,
             repository=name_with_owner,
-            author=author.get("username", "unknown"),
+            author=author.get("login", "unknown"),
             created_at=created_at,
         )

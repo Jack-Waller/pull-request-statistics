@@ -48,7 +48,7 @@ query ($query: String!, $pageSize: Int!, $after: String) {
         url
         createdAt
         author {
-          username
+          login
         }
         repository {
           nameWithOwner
@@ -68,12 +68,12 @@ query ($query: String!, $pageSize: Int!, $after: String) {
     }
     nodes {
       ... on PullRequest {
-        author { username }
+        author { login }
         reviews(first: 100) {
           edges {
             node {
               createdAt
-              author { username }
+              author { login }
             }
           }
         }
@@ -98,7 +98,7 @@ query ($query: String!, $pageSize: Int!, $after: String) {
         url
         createdAt
         author {
-          username
+          login
         }
         repository {
           nameWithOwner
@@ -108,7 +108,7 @@ query ($query: String!, $pageSize: Int!, $after: String) {
             node {
               createdAt
               author {
-                username
+                login
               }
             }
           }
@@ -172,7 +172,7 @@ class PullRequestStatisticsService:
         Count pull requests raised by an author in an organisation within a date range.
 
         Args:
-            author: GitHub user username.
+            author: GitHub user login.
             organisation: GitHub organisation name.
             year: Calendar year to include (optional unless no other period supplied).
             quarter: Quarter to include. Cannot be combined with ``month`` or ``half``.
@@ -217,7 +217,7 @@ class PullRequestStatisticsService:
         than one page is returned.
 
         Args:
-            author: GitHub user username.
+            author: GitHub user login.
             organisation: GitHub organisation name.
             year: Calendar year to include (optional unless no other period supplied).
             quarter: Quarter to include. Cannot be combined with ``month`` or ``half``.
@@ -298,7 +298,7 @@ class PullRequestStatisticsService:
         Count pull requests reviewed by a user in an organisation within a date range.
 
         Args:
-            reviewer: GitHub user username of the reviewer.
+            reviewer: GitHub user login of the reviewer.
             organisation: GitHub organisation name.
             year: Calendar year to include (optional unless no other period supplied).
             quarter: Quarter to include. Cannot be combined with ``month`` or ``half``.
@@ -351,7 +351,7 @@ class PullRequestStatisticsService:
         ``issueCount``, so this iterator inspects review edges directly.
 
         Args:
-            reviewer: GitHub user username of the reviewer.
+            reviewer: GitHub user login of the reviewer.
             organisation: GitHub organisation name.
             year: Calendar year to include (optional unless no other period supplied).
             quarter: Quarter to include. Cannot be combined with ``month`` or ``half``.
@@ -393,7 +393,7 @@ class PullRequestStatisticsService:
             for node in nodes:
                 if node is None:
                     continue
-                if exclude_self_authored and node.get("author", {}).get("username") == reviewer:
+                if exclude_self_authored and node.get("author", {}).get("login") == reviewer:
                     continue
                 if not self._has_review_in_range(
                     reviews=node.get("reviews"),
@@ -466,7 +466,7 @@ class PullRequestStatisticsService:
             )
             statistics.append(
                 MemberStatistics(
-                    username=member,
+                    login=member,
                     authored_count=authored_count,
                     reviewed_count=reviewed_count,
                 )
@@ -526,7 +526,7 @@ class PullRequestStatisticsService:
             for node in nodes:
                 if node is None:
                     continue
-                if exclude_self_authored and node.get("author", {}).get("username") == reviewer:
+                if exclude_self_authored and node.get("author", {}).get("login") == reviewer:
                     continue
                 if self._has_review_in_range(
                     reviews=node.get("reviews"),
@@ -557,7 +557,7 @@ class PullRequestStatisticsService:
             review_node = edge.get("node")
             if not review_node:
                 continue
-            if review_node.get("author", {}).get("username") != reviewer:
+            if review_node.get("author", {}).get("login") != reviewer:
                 continue
             created_at = review_node.get("createdAt")
             if not created_at:
