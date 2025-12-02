@@ -13,15 +13,18 @@ from datetime import UTC, date, datetime
 from github_client.client import GitHubClient
 from github_client.pull_request_statistics import PullRequestStatisticsService
 from github_client.pull_request_statistics.date_ranges import HalfName, MonthName, QuarterName
-from github_client.team_members import TeamMembersService
+from github_client.team_members import TeamMember, TeamMembersService
 from require_env import require_env
 
 
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description="Gather pull request statistics for authored and reviewed PRs.")
-    subject_group = parser.add_mutually_exclusive_group(required=True)
-    subject_group.add_argument("--user", help="GitHub login of the user to analyse for authored and reviewed PRs.")
-    subject_group.add_argument("--team", help="Team slug within the organisation to list members for.")
+    parser.add_argument(
+        "--user",
+        action="append",
+        help="GitHub login of the user to analyse for authored and reviewed PRs. Repeat to include multiple users.",
+    )
+    parser.add_argument("--team", help="Team slug within the organisation to list members for.")
     parser.add_argument("--organisation", required=True, help="GitHub organisation to search within.")
     parser.add_argument("--merged-only", action="store_true", help="Limit authored results to merged pull requests.")
     parser.add_argument(
@@ -42,6 +45,8 @@ def parse_args() -> argparse.Namespace:
         help="Only fetch counts; skip fetching full pull request lists for authored and reviewed queries.",
     )
     args = parser.parse_args()
+    if not args.user and not args.team:
+        parser.error("Provide at least one --user or a --team to analyse.")
     return args
 
 
@@ -71,9 +76,35 @@ def parse_period_inputs(args: argparse.Namespace) -> dict:
     }
 
 
-def gather_authored_statistics(
+def _merge_members(*member_lists: list[TeamMember]) -> list[TeamMember]:
+    merged: dict[str, TeamMember] = {}
+    for members in member_lists:
+        for member in members:
+            key = member.login.lower()
+            existing = merged.get(key)
+            if existing is None:
+                merged[key] = member
+            elif not existing.name and member.name:
+                merged[key] = member
+    return list(merged.values())
+
+
+def resolve_members(
     args: argparse.Namespace,
     *,
+    team_service: TeamMembersService,
+) -> list[TeamMember]:
+    explicit_members = [TeamMember(login=login, name=None) for login in (args.user or [])]
+    team_members: list[TeamMember] = []
+    if args.team:
+        team_members = team_service.list_team_members(args.organisation, args.team)
+    return _merge_members(explicit_members, team_members)
+
+
+def gather_authored_statistics(
+    *,
+    user_login: str,
+    args: argparse.Namespace,
     periods: dict,
     service: PullRequestStatisticsService,
 ) -> tuple[list, tuple[object, int]]:
@@ -81,14 +112,14 @@ def gather_authored_statistics(
     if not args.counts_only:
         authored = list(
             service.iter_pull_requests_by_author_in_date_range(
-                author=args.user,
+                author=user_login,
                 organisation=args.organisation,
                 merged_only=args.merged_only,
                 **periods,
             )
         )
     authored_range, authored_count = service.count_pull_requests_by_author_in_date_range(
-        author=args.user,
+        author=user_login,
         organisation=args.organisation,
         merged_only=args.merged_only,
         **periods,
@@ -97,9 +128,9 @@ def gather_authored_statistics(
 
 
 def gather_reviewed_statistics(
-    args: argparse.Namespace,
-    reviewer: str,
     *,
+    reviewer: str,
+    args: argparse.Namespace,
     periods: dict,
     service: PullRequestStatisticsService,
 ) -> tuple[list, tuple[object, int]]:
@@ -165,18 +196,18 @@ def print_reviewed_results(
         print(f"- REVIEWED {pr.repository} #{pr.number}: {pr.title} {pr.url}", flush=True)
 
 
-def print_team_statistics(
+def print_member_statistics(
     args: argparse.Namespace,
     *,
+    members: list[TeamMember],
+    label: str,
     periods: dict,
     service: PullRequestStatisticsService,
-    team_service: TeamMembersService,
 ) -> None:
-    team_members = team_service.list_team_members(args.organisation, args.team)
     rows: list[tuple[str, str, int, int]] = []
     date_range = None
 
-    for member in team_members:
+    for member in members:
         authored_range, authored_count = service.count_pull_requests_by_author_in_date_range(
             author=member.login,
             organisation=args.organisation,
@@ -201,11 +232,11 @@ def print_team_statistics(
     else:
         period_text = ""
     print(
-        f"Pull request counts for team {args.team} in {args.organisation}{period_text}:",
+        f"Pull request counts for {label} in {args.organisation}{period_text}:",
         flush=True,
     )
     if not rows:
-        print("- No team members found.", flush=True)
+        print("- No members found.", flush=True)
         return
 
     total_authored = sum(authored for _, _, authored, _ in rows)
@@ -251,8 +282,6 @@ def print_team_statistics(
 
 def main() -> None:
     args = parse_args()
-    if args.team:
-        args.counts_only = True
     periods = parse_period_inputs(args)
 
     access_token = require_env("GITHUB_ACCESS_TOKEN")
@@ -260,15 +289,35 @@ def main() -> None:
     service = PullRequestStatisticsService(client, page_size=args.page_size)
     team_service = TeamMembersService(client, page_size=args.page_size)
 
-    if args.team:
-        print_team_statistics(args, periods=periods, service=service, team_service=team_service)
+    members = resolve_members(args, team_service=team_service)
+    if not members:
+        print("No members to analyse.", flush=True)
         return
 
-    reviewer = args.user
-    authored, (authored_range, authored_count) = gather_authored_statistics(args, periods=periods, service=service)
+    multiple_members = len(members) > 1
+    if args.team or multiple_members or (args.user and len(args.user) > 1):
+        args.counts_only = True
+        if args.team and args.user:
+            label = f"team {args.team} and specified users"
+        elif args.team:
+            label = f"team {args.team}"
+        else:
+            label = "specified users"
+        print_member_statistics(args, members=members, label=label, periods=periods, service=service)
+        return
+
+    single_member = members[0]
+    args.user = single_member.login
+    reviewer = single_member.login
+    authored, (authored_range, authored_count) = gather_authored_statistics(
+        user_login=single_member.login,
+        args=args,
+        periods=periods,
+        service=service,
+    )
     reviewed, (reviewed_range, reviewed_count) = gather_reviewed_statistics(
-        args,
-        reviewer,
+        reviewer=reviewer,
+        args=args,
         periods=periods,
         service=service,
     )

@@ -73,7 +73,7 @@ uv run src/main.py --user <username> --organisation <org>
 
 | Argument | Required | Description |
 |----------|----------|-------------|
-| `--user` | Yes (unless `--team` is used) | GitHub login to analyse for authored and reviewed PRs |
+| `--user` | Yes (unless `--team` is used) | GitHub login to analyse for authored and reviewed PRs. Repeat to include multiple users |
 | `--organisation` | Yes | GitHub organization to search within |
 | `--merged-only` | No | Limit authored results to merged pull requests |
 | `--exclude-self-reviews` | No | Exclude self-authored PRs when counting reviews |
@@ -122,6 +122,11 @@ uv run src/main.py --team mighty-llamas --organisation github --week
 ```
 
 When using `--team`, the output includes per-member authored totals, reviewed totals, the percentage of the team's authored PRs each member created, and—when `--exclude-self-reviews` is set—the percentage of other team members' PRs each person reviewed.
+
+Summarise multiple explicit users (counts-only is enabled automatically):
+```bash
+uv run src/main.py --user octocat --user hubot --organisation github --week
+```
 
 ## Development
 
