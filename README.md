@@ -73,7 +73,7 @@ uv run src/main.py --user <username> --organisation <org>
 
 | Argument | Required | Description |
 |----------|----------|-------------|
-| `--user` | Yes (unless `--team` is used) | GitHub login to analyse for authored and reviewed pull requests. Repeat to include multiple users |
+| `--user` | Yes (unless `--team` is used) | GitHub username to analyse for authored and reviewed pull requests. Repeat to include multiple users |
 | `--organisation` | Yes | GitHub organisation to search within |
 | `--merged-only` | No | Limit authored results to merged pull requests |
 | `--exclude-self-reviews` | No | Exclude self-authored pull requests when counting reviews |

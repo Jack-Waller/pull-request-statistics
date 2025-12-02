@@ -23,7 +23,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument(
         "--user",
         action="append",
-        help="GitHub login of the user to analyse for authored and reviewed PRs. Repeat to include multiple users.",
+        help="GitHub username of the user to analyse for authored and reviewed PRs. Repeat to include multiple users.",
     )
     parser.add_argument("--team", help="Team slug within the organisation to list members for.")
     parser.add_argument("--organisation", required=True, help="GitHub organisation to search within.")
@@ -208,9 +208,9 @@ def print_member_statistics(
     rows: list[tuple[str, str, int, int]] = []
 
     for stat in statistics:
-        member = member_lookup.get(stat.login.lower())
-        display_name = f"{stat.login} ({member.name})" if member and member.name else stat.login
-        rows.append((stat.login, display_name, stat.authored_count, stat.reviewed_count))
+        member = member_lookup.get(stat.username.lower())
+        display_name = f"{stat.username} ({member.name})" if member and member.name else stat.username
+        rows.append((stat.username, display_name, stat.authored_count, stat.reviewed_count))
 
     if date_range:
         start = date_range.start_date.isoformat()

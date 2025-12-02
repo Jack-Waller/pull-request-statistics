@@ -31,7 +31,7 @@ def test_authored_pull_requests_iter_and_count(requests_mock, service):
                     "title": "First change",
                     "url": "https://github.com/skyscanner/example/pull/1",
                     "createdAt": "2024-12-01T12:00:00Z",
-                    "author": {"login": "octocat"},
+                    "author": {"username": "octocat"},
                     "repository": {"nameWithOwner": "skyscanner/example"},
                 }
             ],
@@ -79,13 +79,13 @@ def test_reviewed_pull_requests_iter_and_count(requests_mock, service):
             "pageInfo": {"hasNextPage": False, "endCursor": None},
             "nodes": [
                 {
-                    "author": {"login": "other-user"},
+                    "author": {"username": "other-user"},
                     "reviews": {
                         "edges": [
                             {
                                 "node": {
                                     "createdAt": "2024-12-02T10:00:00Z",
-                                    "author": {"login": "octocat"},
+                                    "author": {"username": "octocat"},
                                 }
                             }
                         ]
@@ -104,14 +104,14 @@ def test_reviewed_pull_requests_iter_and_count(requests_mock, service):
                     "title": "Reviewed change",
                     "url": "https://github.com/skyscanner/example/pull/7",
                     "createdAt": "2024-12-02T09:00:00Z",
-                    "author": {"login": "other-user"},
+                    "author": {"username": "other-user"},
                     "repository": {"nameWithOwner": "skyscanner/example"},
                     "reviews": {
                         "edges": [
                             {
                                 "node": {
                                     "createdAt": "2024-12-02T10:00:00Z",
-                                    "author": {"login": "octocat"},
+                                    "author": {"username": "octocat"},
                                 }
                             }
                         ]

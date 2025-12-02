@@ -66,7 +66,7 @@ def test_list_pull_requests_returns_parsed_summaries(service_with_mocked_client)
                     "title": "Improve documentation",
                     "url": "https://github.com/skyscanner/example/pull/42",
                     "createdAt": "2024-12-01T10:00:00Z",
-                    "author": {"login": "octocat"},
+                    "author": {"username": "octocat"},
                     "repository": {"nameWithOwner": "skyscanner/example"},
                 }
             ],
@@ -107,7 +107,7 @@ def test_list_pull_requests_paginates_until_complete(service_with_mocked_client)
                     "title": "First",
                     "url": "https://github.com/skyscanner/example/pull/1",
                     "createdAt": "2024-12-01T08:00:00Z",
-                    "author": {"login": "octocat"},
+                    "author": {"username": "octocat"},
                     "repository": {"nameWithOwner": "skyscanner/example"},
                 }
             ],
@@ -124,7 +124,7 @@ def test_list_pull_requests_paginates_until_complete(service_with_mocked_client)
                     "title": "Second",
                     "url": "https://github.com/skyscanner/example/pull/2",
                     "createdAt": "2024-12-01T09:00:00Z",
-                    "author": {"login": "octocat"},
+                    "author": {"username": "octocat"},
                     "repository": {"nameWithOwner": "skyscanner/example"},
                 },
                 {
@@ -132,7 +132,7 @@ def test_list_pull_requests_paginates_until_complete(service_with_mocked_client)
                     "title": "Third",
                     "url": "https://github.com/skyscanner/example/pull/3",
                     "createdAt": "2024-12-01T11:00:00Z",
-                    "author": {"login": "octocat"},
+                    "author": {"username": "octocat"},
                     "repository": {"nameWithOwner": "skyscanner/example"},
                 },
             ],
@@ -166,14 +166,14 @@ def test_count_pull_requests_reviewed_by_user_in_date_range(service_with_mocked_
                     "title": "Reviewed",
                     "url": "https://github.com/skyscanner/example/pull/10",
                     "createdAt": "2024-12-01T12:00:00Z",
-                    "author": {"login": "another"},
+                    "author": {"username": "another"},
                     "repository": {"nameWithOwner": "skyscanner/example"},
                     "reviews": {
                         "edges": [
                             {
                                 "node": {
                                     "createdAt": "2024-12-01T12:30:00Z",
-                                    "author": {"login": "octocat"},
+                                    "author": {"username": "octocat"},
                                 }
                             }
                         ]
@@ -206,13 +206,13 @@ def test_count_pull_requests_reviewed_skips_none_and_self_authored(service_with_
             "nodes": [
                 None,
                 {
-                    "author": {"login": "octocat"},
+                    "author": {"username": "octocat"},
                     "reviews": {
                         "edges": [
                             {
                                 "node": {
                                     "createdAt": "2024-12-02T12:30:00Z",
-                                    "author": {"login": "octocat"},
+                                    "author": {"username": "octocat"},
                                 }
                             }
                         ]
@@ -247,13 +247,13 @@ def test_count_pull_requests_reviewed_handles_pagination(service_with_mocked_cli
             "pageInfo": {"hasNextPage": False, "endCursor": None},
             "nodes": [
                 {
-                    "author": {"login": "other"},
+                    "author": {"username": "other"},
                     "reviews": {
                         "edges": [
                             {
                                 "node": {
                                     "createdAt": "2024-12-02T12:30:00Z",
-                                    "author": {"login": "octocat"},
+                                    "author": {"username": "octocat"},
                                 }
                             }
                         ]
@@ -288,14 +288,14 @@ def test_iter_pull_requests_reviewed_by_user_excludes_self_authored(service_with
                     "title": "Reviewed change",
                     "url": "https://github.com/skyscanner/example/pull/5",
                     "createdAt": "2024-12-01T12:00:00Z",
-                    "author": {"login": "other-user"},
+                    "author": {"username": "other-user"},
                     "repository": {"nameWithOwner": "skyscanner/example"},
                     "reviews": {
                         "edges": [
                             {
                                 "node": {
                                     "createdAt": "2024-12-01T12:30:00Z",
-                                    "author": {"login": "octocat"},
+                                    "author": {"username": "octocat"},
                                 }
                             }
                         ]
@@ -339,14 +339,14 @@ def test_iter_pull_requests_reviewed_paginates_and_skips_none_nodes(service_with
                     "title": "Reviewed later",
                     "url": "https://github.com/skyscanner/example/pull/6",
                     "createdAt": "2024-12-02T12:00:00Z",
-                    "author": {"login": "another"},
+                    "author": {"username": "another"},
                     "repository": {"nameWithOwner": "skyscanner/example"},
                     "reviews": {
                         "edges": [
                             {
                                 "node": {
                                     "createdAt": "2024-12-02T12:30:00Z",
-                                    "author": {"login": "octocat"},
+                                    "author": {"username": "octocat"},
                                 }
                             }
                         ]
@@ -397,14 +397,14 @@ def test_iter_pull_requests_reviewed_skips_self_authored_when_requested(service_
                     "title": "Self-authored PR",
                     "url": "https://github.com/skyscanner/example/pull/7",
                     "createdAt": "2024-12-01T12:00:00Z",
-                    "author": {"login": "octocat"},
+                    "author": {"username": "octocat"},
                     "repository": {"nameWithOwner": "skyscanner/example"},
                     "reviews": {
                         "edges": [
                             {
                                 "node": {
                                     "createdAt": "2024-12-01T12:30:00Z",
-                                    "author": {"login": "octocat"},
+                                    "author": {"username": "octocat"},
                                 }
                             }
                         ]
@@ -440,9 +440,9 @@ def test_iter_pull_requests_reviewed_ignores_invalid_review_timestamps(service_w
                     "title": "Bad review time",
                     "url": "https://github.com/skyscanner/example/pull/8",
                     "createdAt": "2024-12-01T12:00:00Z",
-                    "author": {"login": "other"},
+                    "author": {"username": "other"},
                     "repository": {"nameWithOwner": "skyscanner/example"},
-                    "reviews": {"edges": [{"node": {"createdAt": "invalid", "author": {"login": "octocat"}}}]},
+                    "reviews": {"edges": [{"node": {"createdAt": "invalid", "author": {"username": "octocat"}}}]},
                 }
             ],
         }
@@ -470,13 +470,13 @@ def test_count_member_statistics_returns_counts(service_with_mocked_client):
                 "pageInfo": {"hasNextPage": False, "endCursor": None},
                 "nodes": [
                     {
-                        "author": {"login": "someone"},
+                        "author": {"username": "someone"},
                         "reviews": {
                             "edges": [
                                 {
                                     "node": {
                                         "createdAt": "2024-12-02T12:30:00Z",
-                                        "author": {"login": "alice"},
+                                        "author": {"username": "alice"},
                                     }
                                 }
                             ]
@@ -491,13 +491,13 @@ def test_count_member_statistics_returns_counts(service_with_mocked_client):
                 "pageInfo": {"hasNextPage": False, "endCursor": None},
                 "nodes": [
                     {
-                        "author": {"login": "another"},
+                        "author": {"username": "another"},
                         "reviews": {
                             "edges": [
                                 {
                                     "node": {
                                         "createdAt": "2024-12-03T12:30:00Z",
-                                        "author": {"login": "bob"},
+                                        "author": {"username": "bob"},
                                     }
                                 }
                             ]
@@ -518,8 +518,8 @@ def test_count_member_statistics_returns_counts(service_with_mocked_client):
 
     assert date_range == DateRange(start_date=date(2024, 12, 1), end_date=date(2024, 12, 31))
     assert statistics == [
-        MemberStatistics(login="alice", authored_count=2, reviewed_count=1),
-        MemberStatistics(login="bob", authored_count=1, reviewed_count=1),
+        MemberStatistics(username="alice", authored_count=2, reviewed_count=1),
+        MemberStatistics(username="bob", authored_count=1, reviewed_count=1),
     ]
     assert calls[0]["query"].strip() == COUNT_QUERY.strip()
     assert calls[1]["query"].strip() == REVIEW_COUNT_QUERY.strip()
@@ -545,13 +545,13 @@ def test_count_reviewed_respects_exclude_self_authored(service_with_mocked_clien
                 "pageInfo": {"hasNextPage": False, "endCursor": None},
                 "nodes": [
                     {
-                        "author": {"login": "alice"},
+                        "author": {"username": "alice"},
                         "reviews": {
                             "edges": [
                                 {
                                     "node": {
                                         "createdAt": "2024-12-02T12:30:00Z",
-                                        "author": {"login": "alice"},
+                                        "author": {"username": "alice"},
                                     }
                                 }
                             ]
@@ -598,17 +598,17 @@ def test_iter_pull_requests_reviewed_exercises_all_review_filters(service_with_m
                     "title": "Various reviews",
                     "url": "https://github.com/skyscanner/example/pull/9",
                     "createdAt": "2024-12-01T12:00:00Z",
-                    "author": {"login": "another"},
+                    "author": {"username": "another"},
                     "repository": {"nameWithOwner": "skyscanner/example"},
                     "reviews": {
                         "edges": [
                             {"node": None},
-                            {"node": {"createdAt": "2024-12-01T12:00:00Z", "author": {"login": "someone-else"}}},
-                            {"node": {"author": {"login": "octocat"}}},
+                            {"node": {"createdAt": "2024-12-01T12:00:00Z", "author": {"username": "someone-else"}}},
+                            {"node": {"author": {"username": "octocat"}}},
                             {
                                 "node": {
                                     "createdAt": "2024-12-02T12:30:00Z",
-                                    "author": {"login": "octocat"},
+                                    "author": {"username": "octocat"},
                                 }
                             },
                         ]

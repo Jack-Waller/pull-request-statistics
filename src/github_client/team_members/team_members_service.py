@@ -16,7 +16,7 @@ from github_client.team_members.team_member import TeamMember
 
 TEAM_MEMBERS_QUERY = """
 query($organisation: String!, $team: String!, $pageSize: Int!, $after: String) {
-  organization(login: $organisation) {
+  organization(username: $organisation) {
     team(slug: $team) {
       members(first: $pageSize, after: $after) {
         pageInfo {
@@ -24,7 +24,7 @@ query($organisation: String!, $team: String!, $pageSize: Int!, $after: String) {
           endCursor
         }
         nodes {
-          login
+          username
           name
         }
       }
@@ -45,11 +45,11 @@ def _build_member(node: dict) -> TeamMember:
         ``GitHubTeamMember`` populated from the provided node.
 
     Raises:
-        MalformedResponseError: When the required ``login`` field is missing.
+        MalformedResponseError: When the required ``username`` field is missing.
     """
-    login = node.get("login")
+    login = node.get("username")
     if not login:
-        raise MalformedResponseError("GitHub response missing login for a team member")
+        raise MalformedResponseError("GitHub response missing username for a team member")
     return TeamMember(login=login, name=node.get("name"))
 
 
@@ -63,7 +63,7 @@ def _extract_members_page(
 
     Args:
         data: The parsed response returned by the GitHub client.
-        organisation: Organisation login, for error messages.
+        organisation: Organisation username, for error messages.
         team_slug: Team slug, for error messages.
 
     Returns:
@@ -130,7 +130,7 @@ class TeamMembersService:
         Return all members of a GitHub team.
 
         Args:
-            organisation: The organisation login to search within.
+            organisation: The organisation username to search within.
             team_slug: The slug of the team to fetch members for.
 
         Returns:
