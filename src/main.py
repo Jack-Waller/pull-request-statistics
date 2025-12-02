@@ -19,7 +19,9 @@ from require_env import require_env
 
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description="Gather pull request statistics for authored and reviewed PRs.")
-    parser.add_argument("--author", required=True, help="GitHub login of the author to analyse.")
+    subject_group = parser.add_mutually_exclusive_group(required=True)
+    subject_group.add_argument("--author", help="GitHub login of the author to analyse.")
+    subject_group.add_argument("--team", help="Team slug within the organisation to list members for.")
     parser.add_argument("--organisation", required=True, help="GitHub organisation to search within.")
     parser.add_argument("--reviewer", help="GitHub login of the reviewer. Defaults to the author.")
     parser.add_argument("--merged-only", action="store_true", help="Limit authored results to merged pull requests.")
@@ -40,8 +42,10 @@ def parse_args() -> argparse.Namespace:
         action="store_true",
         help="Only fetch counts; skip fetching full pull request lists for authored and reviewed queries.",
     )
-    parser.add_argument("--team", help="Team slug within the organisation to list members for.")
-    return parser.parse_args()
+    args = parser.parse_args()
+    if args.team and args.reviewer:
+        parser.error("--team cannot be combined with --reviewer; team statistics include review counts per member.")
+    return args
 
 
 def default_periods(args: argparse.Namespace) -> None:
@@ -70,15 +74,12 @@ def parse_period_inputs(args: argparse.Namespace) -> dict:
     }
 
 
-def main() -> None:
-    args = parse_args()
-    periods = parse_period_inputs(args)
-
-    access_token = require_env("GITHUB_ACCESS_TOKEN")
-    client = GitHubClient(access_token=access_token)
-    service = PullRequestStatisticsService(client, page_size=args.page_size)
-    team_service = TeamMembersService(client, page_size=args.page_size)
-
+def gather_authored_statistics(
+    args: argparse.Namespace,
+    *,
+    periods: dict,
+    service: PullRequestStatisticsService,
+) -> tuple[list, tuple[object, int]]:
     authored = []
     if not args.counts_only:
         authored = list(
@@ -95,8 +96,16 @@ def main() -> None:
         merged_only=args.merged_only,
         **periods,
     )
+    return authored, (authored_range, authored_count)
 
-    reviewer = args.reviewer or args.author
+
+def gather_reviewed_statistics(
+    args: argparse.Namespace,
+    reviewer: str,
+    *,
+    periods: dict,
+    service: PullRequestStatisticsService,
+) -> tuple[list, tuple[object, int]]:
     reviewed = []
     if not args.counts_only:
         reviewed = list(
@@ -113,40 +122,128 @@ def main() -> None:
         exclude_self_authored=args.exclude_self_reviews,
         **periods,
     )
+    return reviewed, (reviewed_range, reviewed_count)
 
+
+def print_authored_results(
+    args: argparse.Namespace,
+    authored: list,
+    authored_range: object,
+    authored_count: int,
+) -> None:
+    merged_suffix = " Merged only." if args.merged_only else ""
     print(
         (
             f"Authored PRs for {args.author} in {args.organisation}: {authored_count} "
             f"from {authored_range.start_date.isoformat()} to {authored_range.end_date.isoformat()} "
-            f"(retrieved {len(authored)}).{' Merged only.' if args.merged_only else ''}"
+            f"(retrieved {len(authored)}).{merged_suffix}"
         ),
         flush=True,
     )
-    if not args.counts_only:
-        for pr in authored:
-            print(f"- {pr.repository} #{pr.number}: {pr.title} {pr.url}", flush=True)
+    if args.counts_only:
+        return
+    for pr in authored:
+        print(f"- {pr.repository} #{pr.number}: {pr.title} {pr.url}", flush=True)
 
+
+def print_reviewed_results(
+    args: argparse.Namespace,
+    reviewer: str,
+    reviewed: list,
+    reviewed_range: object,
+    reviewed_count: int,
+) -> None:
+    suffix = " Excluding self-authored." if args.exclude_self_reviews else ""
     print(
         (
             f"Reviewed PRs by {reviewer} in {args.organisation}: {reviewed_count} "
             f"from {reviewed_range.start_date.isoformat()} to {reviewed_range.end_date.isoformat()} "
-            f"(retrieved {len(reviewed)}).{' Excluding self-authored.' if args.exclude_self_reviews else ''}"
+            f"(retrieved {len(reviewed)}).{suffix}"
         ),
         flush=True,
     )
-    if not args.counts_only:
-        for pr in reviewed:
-            print(f"- REVIEWED {pr.repository} #{pr.number}: {pr.title} {pr.url}", flush=True)
+    if args.counts_only:
+        return
+    for pr in reviewed:
+        print(f"- REVIEWED {pr.repository} #{pr.number}: {pr.title} {pr.url}", flush=True)
+
+
+def print_team_statistics(
+    args: argparse.Namespace,
+    *,
+    periods: dict,
+    service: PullRequestStatisticsService,
+    team_service: TeamMembersService,
+) -> None:
+    team_members = team_service.list_team_members(args.organisation, args.team)
+    rows: list[tuple[str, int, int]] = []
+    date_range = None
+
+    for member in team_members:
+        authored_range, authored_count = service.count_pull_requests_by_author_in_date_range(
+            author=member.login,
+            organisation=args.organisation,
+            merged_only=args.merged_only,
+            **periods,
+        )
+        _, reviewed_count = service.count_pull_requests_reviewed_by_user_in_date_range(
+            reviewer=member.login,
+            organisation=args.organisation,
+            exclude_self_authored=args.exclude_self_reviews,
+            **periods,
+        )
+        if date_range is None:
+            date_range = authored_range
+        member_display = f"{member.login} ({member.name})" if member.name else member.login
+        rows.append((member_display, authored_count, reviewed_count))
+
+    if date_range:
+        start = date_range.start_date.isoformat()
+        end = date_range.end_date.isoformat()
+        period_text = f" from {start} to {end}"
+    else:
+        period_text = ""
+    print(
+        f"Pull request counts for team {args.team} in {args.organisation}{period_text}:",
+        flush=True,
+    )
+    if not rows:
+        print("- No team members found.", flush=True)
+        return
+
+    name_width = max(len("Member"), *(len(name) for name, _, _ in rows))
+    header = f"{'Member':<{name_width}} {'Authored':>10} {'Reviewed':>10}"
+    print(header, flush=True)
+    print("-" * len(header), flush=True)
+    for name, authored_count, reviewed_count in rows:
+        print(f"{name:<{name_width}} {authored_count:>10} {reviewed_count:>10}", flush=True)
+
+
+def main() -> None:
+    args = parse_args()
+    if args.team:
+        args.counts_only = True
+    periods = parse_period_inputs(args)
+
+    access_token = require_env("GITHUB_ACCESS_TOKEN")
+    client = GitHubClient(access_token=access_token)
+    service = PullRequestStatisticsService(client, page_size=args.page_size)
+    team_service = TeamMembersService(client, page_size=args.page_size)
 
     if args.team:
-        team_members = team_service.list_team_members(args.organisation, args.team)
-        print(
-            f"Team members for {args.team} in {args.organisation}: {len(team_members)}",
-            flush=True,
-        )
-        for member in team_members:
-            suffix = f" ({member.name})" if member.name else ""
-            print(f"- {member.login}{suffix}", flush=True)
+        print_team_statistics(args, periods=periods, service=service, team_service=team_service)
+        return
+
+    reviewer = args.reviewer or args.author
+    authored, (authored_range, authored_count) = gather_authored_statistics(args, periods=periods, service=service)
+    reviewed, (reviewed_range, reviewed_count) = gather_reviewed_statistics(
+        args,
+        reviewer,
+        periods=periods,
+        service=service,
+    )
+    print_authored_results(args, authored, authored_range, authored_count)
+    print_reviewed_results(args, reviewer, reviewed, reviewed_range, reviewed_count)
 
 
 if __name__ == "__main__":

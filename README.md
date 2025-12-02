@@ -9,7 +9,7 @@ A Python CLI tool for gathering and summarizing GitHub pull request statistics f
 - **Flexible Date Ranges**: Filter by year, quarter, half-year, month, week, or a specific date
 - **Filtering Options**: Limit to merged-only PRs or exclude self-authored reviews
 - **Pagination Support**: Configurable page sizes for efficient API usage
-- **Team Members**: List members of a GitHub team within an organisation
+- **Team Members**: List members of a GitHub team within an organisation and gather per-member pull request counts
 
 ## Requirements
 
@@ -73,9 +73,9 @@ uv run src/main.py --author <username> --organisation <org>
 
 | Argument | Required | Description |
 |----------|----------|-------------|
-| `--author` | Yes | GitHub login of the author to analyse |
+| `--author` | Yes (unless `--team` is used) | GitHub login of the author to analyse |
 | `--organisation` | Yes | GitHub organization to search within |
-| `--reviewer` | No | GitHub login of the reviewer (defaults to author) |
+| `--reviewer` | No | GitHub login of the reviewer (defaults to author). Cannot be combined with `--team` |
 | `--merged-only` | No | Limit authored results to merged pull requests |
 | `--exclude-self-reviews` | No | Exclude self-authored PRs when counting reviews |
 | `--quarter` | No | Quarter to search (e.g., Q1, Q2, Q3, Q4) |
@@ -86,7 +86,7 @@ uv run src/main.py --author <username> --organisation <org>
 | `--date` | No | Specific date to search (YYYY-MM-DD) |
 | `--page-size` | No | Page size for GitHub API pagination (default: 50) |
 | `--counts-only` | No | Only fetch counts, skip fetching full PR lists |
-| `--team` | No | Team slug within the organisation to list members for |
+| `--team` | No | Team slug within the organisation to summarise. Enables counts-only output and cannot be combined with `--author` or `--reviewer` |
 
 If no quarter, half, month, week, year, or date is provided, the tool defaults to the current quarter.
 
@@ -114,7 +114,12 @@ uv run src/main.py --author octocat --organisation github --date 2024-03-15
 
 List team members for a slug within an organisation:
 ```bash
-uv run src/main.py --author octocat --organisation github --team mighty-llamas --counts-only
+uv run src/main.py --team mighty-llamas --organisation github
+```
+
+Get per-member counts (authored and reviewed) for a team over the most recent week:
+```bash
+uv run src/main.py --team mighty-llamas --organisation github --week
 ```
 
 ## Development
