@@ -6,7 +6,7 @@ whether to catch specific client failures or allow them to bubble up to a
 global handler.
 """
 
-from github_client.errors.github_client_error import GitHubClientError
-from github_client.errors.malformed_response_error import MalformedResponseError
+from .github_client_error import GitHubClientError
+from .malformed_response_error import MalformedResponseError
 
 __all__ = ["GitHubClientError", "MalformedResponseError"]

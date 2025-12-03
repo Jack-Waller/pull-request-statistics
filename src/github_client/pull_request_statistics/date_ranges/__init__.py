@@ -1,15 +1,15 @@
 """Date range builders for calendar periods."""
 
-from github_client.pull_request_statistics.date_ranges.date_range import DateRange
-from github_client.pull_request_statistics.date_ranges.date_range_factory import DateRangeFactory
-from github_client.pull_request_statistics.date_ranges.enums.half import HalfName
-from github_client.pull_request_statistics.date_ranges.enums.month import MonthName
-from github_client.pull_request_statistics.date_ranges.enums.quarter import QuarterName
+from .date_range import DateRange
+from .date_range_factory import DateRangeFactory
+from .enums.half import Half
+from .enums.month import Month
+from .enums.quarter import Quarter
 
 __all__ = [
     "DateRange",
     "DateRangeFactory",
-    "HalfName",
-    "MonthName",
-    "QuarterName",
+    "Half",
+    "Month",
+    "Quarter",
 ]

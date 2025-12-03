@@ -6,9 +6,9 @@ import calendar
 from datetime import UTC, date, datetime, timedelta
 
 from github_client.pull_request_statistics.date_ranges.date_range import DateRange
-from github_client.pull_request_statistics.date_ranges.enums.half import HalfName
-from github_client.pull_request_statistics.date_ranges.enums.month import MonthName
-from github_client.pull_request_statistics.date_ranges.enums.quarter import QuarterName
+from github_client.pull_request_statistics.date_ranges.enums.half import Half
+from github_client.pull_request_statistics.date_ranges.enums.month import Month
+from github_client.pull_request_statistics.date_ranges.enums.quarter import Quarter
 
 
 class DateRangeFactory:
@@ -30,7 +30,7 @@ class DateRangeFactory:
         """
         self._default_today = default_today
 
-    def for_quarter(self, quarter: QuarterName, *, today: date | None = None) -> DateRange:
+    def for_quarter(self, quarter: Quarter, *, today: date | None = None) -> DateRange:
         """
         Return the most recent completed occurrence of ``quarter`` or the in-progress range.
 
@@ -56,7 +56,7 @@ class DateRangeFactory:
         )
         return DateRange(start, end)
 
-    def for_quarter_in_year(self, quarter: QuarterName, year: int) -> DateRange:
+    def for_quarter_in_year(self, quarter: Quarter, year: int) -> DateRange:
         """
         Return the full date range for ``quarter`` within ``year``.
 
@@ -95,7 +95,7 @@ class DateRangeFactory:
         end = current if year == current.year else date(year, 12, 31)
         return DateRange(start, end)
 
-    def for_month(self, month: MonthName, *, today: date | None = None) -> DateRange:
+    def for_month(self, month: Month, *, today: date | None = None) -> DateRange:
         """
         Return the most recent completed occurrence of ``month`` or the in-progress range.
 
@@ -110,7 +110,7 @@ class DateRangeFactory:
             Inclusive date range for the requested month.
         """
         current = self._resolve_today(today)
-        current_month = MonthName(current.month)
+        current_month = Month(current.month)
         target_year = self._resolve_relative_year(month.value, current_month.value, current.year)
 
         start = date(target_year, month.value, 1)
@@ -121,7 +121,7 @@ class DateRangeFactory:
         )
         return DateRange(start, end)
 
-    def for_month_in_year(self, month: MonthName, year: int) -> DateRange:
+    def for_month_in_year(self, month: Month, year: int) -> DateRange:
         """
         Return the full date range for ``month`` within ``year``.
 
@@ -140,7 +140,7 @@ class DateRangeFactory:
         end = self._end_of_month(year, month)
         return DateRange(start, end)
 
-    def for_half(self, half: HalfName, *, today: date | None = None) -> DateRange:
+    def for_half(self, half: Half, *, today: date | None = None) -> DateRange:
         """
         Return the most recent completed occurrence of ``half`` or the in-progress range.
 
@@ -164,7 +164,7 @@ class DateRangeFactory:
         )
         return DateRange(start, end)
 
-    def for_half_in_year(self, half: HalfName, year: int) -> DateRange:
+    def for_half_in_year(self, half: Half, year: int) -> DateRange:
         """
         Return the full date range for ``half`` within ``year``.
 
@@ -228,43 +228,43 @@ class DateRangeFactory:
         return current_year - 1 if target_period > current_period else current_year
 
     @staticmethod
-    def _quarter_start_date(quarter: QuarterName, year: int) -> date:
+    def _quarter_start_date(quarter: Quarter, year: int) -> date:
         """Return the first day of the quarter."""
         start_month = (quarter.value - 1) * 3 + 1
         return date(year, start_month, 1)
 
-    def _quarter_end_date(self, quarter: QuarterName, year: int) -> date:
+    def _quarter_end_date(self, quarter: Quarter, year: int) -> date:
         """Return the final day of the quarter."""
         start = self._quarter_start_date(quarter, year)
         end_month = start.month + 2
-        return self._end_of_month(year, MonthName(end_month))
+        return self._end_of_month(year, Month(end_month))
 
     @staticmethod
-    def _half_start_date(half: HalfName, year: int) -> date:
+    def _half_start_date(half: Half, year: int) -> date:
         """Return the first day of the half-year period."""
-        start_month = 1 if half == HalfName.H1 else 7
+        start_month = 1 if half == Half.H1 else 7
         return date(year, start_month, 1)
 
-    def _half_end_date(self, half: HalfName, year: int) -> date:
+    def _half_end_date(self, half: Half, year: int) -> date:
         """Return the final day of the half-year period."""
         start = self._half_start_date(half, year)
         end_month = start.month + 5
-        return self._end_of_month(year, MonthName(end_month))
+        return self._end_of_month(year, Month(end_month))
 
     @staticmethod
-    def _end_of_month(year: int, month: MonthName) -> date:
+    def _end_of_month(year: int, month: Month) -> date:
         """Return the final day of the given month."""
         return date(year, month.value, calendar.monthrange(year, month.value)[1])
 
     @staticmethod
-    def _quarter_for_date(value: date) -> QuarterName:
+    def _quarter_for_date(value: date) -> Quarter:
         """Return the calendar quarter that contains ``value``."""
-        return QuarterName(((value.month - 1) // 3) + 1)
+        return Quarter(((value.month - 1) // 3) + 1)
 
     @staticmethod
-    def _half_for_date(value: date) -> HalfName:
+    def _half_for_date(value: date) -> Half:
         """Return the half-year segment that contains ``value``."""
-        return HalfName(1 if value.month <= 6 else 2)
+        return Half(1 if value.month <= 6 else 2)
 
     @staticmethod
     def _validate_year(year: int) -> None:
@@ -279,19 +279,19 @@ class DateRangeFactory:
             raise ValueError("year must not be in the future.")
 
     @staticmethod
-    def _ensure_quarter_not_future(quarter: QuarterName, year: int, reference_date: date) -> None:
+    def _ensure_quarter_not_future(quarter: Quarter, year: int, reference_date: date) -> None:
         """Prevent creation of quarters beyond the current quarter in the current year."""
         if year == reference_date.year and quarter.value > DateRangeFactory._quarter_for_date(reference_date).value:
             raise ValueError("quarter must not be in the future.")
 
     @staticmethod
-    def _ensure_month_not_future(month: MonthName, year: int, reference_date: date) -> None:
+    def _ensure_month_not_future(month: Month, year: int, reference_date: date) -> None:
         """Prevent creation of months beyond the current month in the current year."""
         if year == reference_date.year and month.value > reference_date.month:
             raise ValueError("month must not be in the future.")
 
     @staticmethod
-    def _ensure_half_not_future(half: HalfName, year: int, reference_date: date) -> None:
+    def _ensure_half_not_future(half: Half, year: int, reference_date: date) -> None:
         """Prevent creation of halves beyond the current half in the current year."""
         if year == reference_date.year and half.value > DateRangeFactory._half_for_date(reference_date).value:
             raise ValueError("half must not be in the future.")

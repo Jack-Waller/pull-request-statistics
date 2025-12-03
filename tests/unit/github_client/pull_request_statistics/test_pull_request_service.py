@@ -1,13 +1,49 @@
 """Unit tests for pull request statistics queries."""
 
 from datetime import UTC, date, datetime
+from textwrap import dedent
 
 import pytest
 
 from github_client.errors import MalformedResponseError
-from github_client.pull_request_statistics import COUNT_QUERY, REVIEW_COUNT_QUERY
-from github_client.pull_request_statistics.date_ranges import DateRange, HalfName, MonthName, QuarterName
+from github_client.pull_request_statistics.date_ranges import DateRange, Half, Month, Quarter
 from github_client.pull_request_statistics.models import MemberStatistics, PullRequestSummary
+
+COUNT_QUERY = dedent(
+    """
+    query ($query: String!) {
+      search(query: $query, type: ISSUE, first: 1) {
+        issueCount
+      }
+    }
+    """
+)
+
+REVIEW_COUNT_QUERY = dedent(
+    """
+    query ($query: String!, $pageSize: Int!, $after: String) {
+      search(query: $query, type: ISSUE, first: $pageSize, after: $after) {
+        pageInfo {
+          hasNextPage
+          endCursor
+        }
+        nodes {
+          ... on PullRequest {
+            author { login }
+            reviews(first: 100) {
+              edges {
+                node {
+                  createdAt
+                  author { login }
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+    """
+)
 
 
 def test_build_search_query_uses_full_range_window(service_with_mocked_client):
@@ -42,7 +78,7 @@ def test_count_pull_requests_returns_issue_count(service_with_mocked_client):
 
     date_range, result = service.count_pull_requests_by_author_in_date_range(
         author="octocat",
-        month=MonthName.DECEMBER,
+        month=Month.DECEMBER,
         year=2024,
     )
 
@@ -74,7 +110,7 @@ def test_list_pull_requests_returns_parsed_summaries(service_with_mocked_client)
     summaries = list(
         service.iter_pull_requests_by_author_in_date_range(
             author="octocat",
-            month=MonthName.DECEMBER,
+            month=Month.DECEMBER,
             year=2024,
         )
     )
@@ -139,7 +175,7 @@ def test_list_pull_requests_paginates_until_complete(service_with_mocked_client)
     summaries = list(
         service.iter_pull_requests_by_author_in_date_range(
             author="octocat",
-            month=MonthName.DECEMBER,
+            month=Month.DECEMBER,
             year=2024,
         )
     )
@@ -181,7 +217,7 @@ def test_count_pull_requests_reviewed_by_user_in_date_range(service_with_mocked_
 
     date_range, result = service.count_pull_requests_reviewed_by_user_in_date_range(
         reviewer="octocat",
-        month=MonthName.DECEMBER,
+        month=Month.DECEMBER,
         year=2024,
     )
 
@@ -219,7 +255,7 @@ def test_count_pull_requests_reviewed_skips_none_and_self_authored(service_with_
 
     _, count = service.count_pull_requests_reviewed_by_user_in_date_range(
         reviewer="octocat",
-        month=MonthName.DECEMBER,
+        month=Month.DECEMBER,
         year=2024,
         exclude_self_authored=True,
     )
@@ -259,7 +295,7 @@ def test_count_pull_requests_reviewed_handles_pagination(service_with_mocked_cli
 
     _, count = service.count_pull_requests_reviewed_by_user_in_date_range(
         reviewer="octocat",
-        month=MonthName.DECEMBER,
+        month=Month.DECEMBER,
         year=2024,
     )
 
@@ -301,7 +337,7 @@ def test_iter_pull_requests_reviewed_by_user_excludes_self_authored(service_with
     summaries = list(
         service.iter_pull_requests_reviewed_by_user_in_date_range(
             reviewer="octocat",
-            month=MonthName.DECEMBER,
+            month=Month.DECEMBER,
             year=2024,
             exclude_self_authored=True,
         )
@@ -351,7 +387,7 @@ def test_iter_pull_requests_reviewed_paginates_and_skips_none_nodes(service_with
     summaries = list(
         service.iter_pull_requests_reviewed_by_user_in_date_range(
             reviewer="octocat",
-            month=MonthName.DECEMBER,
+            month=Month.DECEMBER,
             year=2024,
         )
     )
@@ -407,7 +443,7 @@ def test_iter_pull_requests_reviewed_skips_self_authored_when_requested(service_
     summaries = list(
         service.iter_pull_requests_reviewed_by_user_in_date_range(
             reviewer="octocat",
-            month=MonthName.DECEMBER,
+            month=Month.DECEMBER,
             year=2024,
             exclude_self_authored=True,
         )
@@ -440,7 +476,7 @@ def test_iter_pull_requests_reviewed_ignores_invalid_review_timestamps(service_w
     summaries = list(
         service.iter_pull_requests_reviewed_by_user_in_date_range(
             reviewer="octocat",
-            month=MonthName.DECEMBER,
+            month=Month.DECEMBER,
             year=2024,
         )
     )
@@ -498,7 +534,7 @@ def test_count_member_statistics_returns_counts(service_with_mocked_client):
 
     date_range, statistics = service.count_member_statistics(
         members=["alice", "bob", "alice"],
-        month=MonthName.DECEMBER,
+        month=Month.DECEMBER,
         year=2024,
     )
 
@@ -551,7 +587,7 @@ def test_count_reviewed_respects_exclude_self_authored(service_with_mocked_clien
 
     _, count = service.count_pull_requests_reviewed_by_user_in_date_range(
         reviewer="alice",
-        month=MonthName.DECEMBER,
+        month=Month.DECEMBER,
         year=2024,
         exclude_self_authored=True,
     )
@@ -607,7 +643,7 @@ def test_iter_pull_requests_reviewed_exercises_all_review_filters(service_with_m
     summaries = list(
         service.iter_pull_requests_reviewed_by_user_in_date_range(
             reviewer="octocat",
-            month=MonthName.DECEMBER,
+            month=Month.DECEMBER,
             year=2024,
         )
     )
@@ -617,7 +653,7 @@ def test_iter_pull_requests_reviewed_exercises_all_review_filters(service_with_m
     service, _ = service_with_mocked_client(responses=[response])
     _, count = service.count_pull_requests_reviewed_by_user_in_date_range(
         reviewer="octocat",
-        month=MonthName.DECEMBER,
+        month=Month.DECEMBER,
         year=2024,
     )
     assert count == 1
@@ -656,8 +692,8 @@ def test_period_selection_rejects_multiple_periods(service_with_mocked_client):
     with pytest.raises(ValueError, match="Specify only one of month, quarter or half"):
         service.count_pull_requests_by_author_in_date_range(
             author="octocat",
-            month=MonthName.JANUARY,
-            quarter=QuarterName.Q1,
+            month=Month.JANUARY,
+            quarter=Quarter.Q1,
             year=2024,
         )
 
@@ -668,7 +704,7 @@ def test_half_with_year_is_supported(service_with_mocked_client):
 
     date_range, _ = service.count_pull_requests_by_author_in_date_range(
         author="octocat",
-        half=HalfName.H1,
+        half=Half.H1,
         year=2023,
     )
 
@@ -708,7 +744,7 @@ def test_count_supports_half_without_year(service_with_mocked_client):
 
     date_range, _ = service.count_pull_requests_by_author_in_date_range(
         author="octocat",
-        half=HalfName.H2,
+        half=Half.H2,
     )
 
     assert date_range == DateRange(start_date=date(2024, 7, 1), end_date=date(2024, 12, 31))
@@ -720,7 +756,7 @@ def test_count_supports_quarter_without_year(service_with_mocked_client):
 
     date_range, _ = service.count_pull_requests_by_author_in_date_range(
         author="octocat",
-        quarter=QuarterName.Q4,
+        quarter=Quarter.Q4,
     )
 
     assert date_range == DateRange(start_date=date(2024, 10, 1), end_date=date(2024, 12, 31))
@@ -732,7 +768,7 @@ def test_count_supports_month_without_year(service_with_mocked_client):
 
     date_range, _ = service.count_pull_requests_by_author_in_date_range(
         author="octocat",
-        month=MonthName.DECEMBER,
+        month=Month.DECEMBER,
     )
 
     assert date_range == DateRange(start_date=date(2024, 12, 1), end_date=date(2024, 12, 31))
@@ -744,7 +780,7 @@ def test_count_supports_quarter_with_year(service_with_mocked_client):
 
     date_range, _ = service.count_pull_requests_by_author_in_date_range(
         author="octocat",
-        quarter=QuarterName.Q2,
+        quarter=Quarter.Q2,
         year=2023,
     )
 

@@ -5,7 +5,7 @@ from __future__ import annotations
 from enum import IntEnum
 
 
-class MonthName(IntEnum):
+class Month(IntEnum):
     """Months of the calendar year."""
 
     JANUARY = 1
@@ -22,7 +22,7 @@ class MonthName(IntEnum):
     DECEMBER = 12
 
     @classmethod
-    def from_string(cls, value: str | int | MonthName) -> MonthName:
+    def from_string(cls, value: str | int | Month) -> Month:
         """
         Parse a month from a numeric or textual representation.
 

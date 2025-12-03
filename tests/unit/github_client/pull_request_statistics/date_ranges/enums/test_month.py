@@ -2,26 +2,26 @@ import re
 
 import pytest
 
-from github_client.pull_request_statistics.date_ranges import MonthName
+from github_client.pull_request_statistics.date_ranges import Month
 
 
 class TestMonthNameFromString:
     @pytest.mark.parametrize(
         ("value", "expected"),
         [
-            ("January", MonthName.JANUARY),
-            ("jAnUaRy", MonthName.JANUARY),
-            ("JAN", MonthName.JANUARY),
-            ("jan", MonthName.JANUARY),
-            ("3", MonthName.MARCH),
-            ("12", MonthName.DECEMBER),
-            ("Dec", MonthName.DECEMBER),
-            ("dEcEmBeR", MonthName.DECEMBER),
-            (MonthName.AUGUST, MonthName.AUGUST),
+            ("January", Month.JANUARY),
+            ("jAnUaRy", Month.JANUARY),
+            ("JAN", Month.JANUARY),
+            ("jan", Month.JANUARY),
+            ("3", Month.MARCH),
+            ("12", Month.DECEMBER),
+            ("Dec", Month.DECEMBER),
+            ("dEcEmBeR", Month.DECEMBER),
+            (Month.AUGUST, Month.AUGUST),
         ],
     )
-    def test_accepts_varied_case_and_numeric_inputs(self, value: str | int | MonthName, expected: MonthName) -> None:
-        assert MonthName.from_string(value) is expected
+    def test_accepts_varied_case_and_numeric_inputs(self, value: str | int | Month, expected: Month) -> None:
+        assert Month.from_string(value) is expected
 
     @pytest.mark.parametrize(
         ("value", "message"),
@@ -34,5 +34,5 @@ class TestMonthNameFromString:
     )
     def test_rejects_invalid_values(self, value: str, message: str) -> None:
         with pytest.raises(ValueError, match=re.escape(message)) as exc:
-            MonthName.from_string(value)
+            Month.from_string(value)
         assert str(exc.value) == message

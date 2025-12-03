@@ -4,9 +4,11 @@ from uuid import uuid4
 
 import pytest
 
-from github_client.client import GITHUB_GRAPHQL_ENDPOINT, GitHubClient
+from github_client.client import GitHubClient
 from github_client.errors import MalformedResponseError
 from github_client.team_members import TeamMembersService
+
+GRAPHQL_ENDPOINT = "https://api.github.com/graphql"
 
 
 @pytest.fixture
@@ -19,7 +21,7 @@ def team_service() -> TeamMembersService:
 def test_list_team_members_returns_members(requests_mock, team_service: TeamMembersService) -> None:
     """Team members should be returned with both login and name data."""
     requests_mock.post(
-        GITHUB_GRAPHQL_ENDPOINT,
+        GRAPHQL_ENDPOINT,
         json={
             "data": {
                 "organization": {
@@ -55,7 +57,7 @@ def test_list_team_members_returns_members(requests_mock, team_service: TeamMemb
 def test_list_team_members_paginates(requests_mock, team_service: TeamMembersService) -> None:
     """The service should continue fetching pages until ``hasNextPage`` is false."""
     requests_mock.post(
-        GITHUB_GRAPHQL_ENDPOINT,
+        GRAPHQL_ENDPOINT,
         [
             {
                 "json": {
@@ -99,7 +101,7 @@ def test_list_team_members_paginates(requests_mock, team_service: TeamMembersSer
 def test_list_team_members_raises_when_team_missing(requests_mock, team_service: TeamMembersService) -> None:
     """A missing team should raise an error rather than returning an empty list."""
     requests_mock.post(
-        GITHUB_GRAPHQL_ENDPOINT,
+        GRAPHQL_ENDPOINT,
         json={"data": {"organization": {"team": None}}},
     )
 
@@ -110,7 +112,7 @@ def test_list_team_members_raises_when_team_missing(requests_mock, team_service:
 def test_iter_team_members_requires_login(requests_mock, team_service: TeamMembersService) -> None:
     """Each member entry must include a login value."""
     requests_mock.post(
-        GITHUB_GRAPHQL_ENDPOINT,
+        GRAPHQL_ENDPOINT,
         json={
             "data": {
                 "organization": {
@@ -155,7 +157,7 @@ def test_iter_team_members_raises_on_malformed_structures(
     requests_mock, team_service: TeamMembersService, response_json: dict, message: str
 ) -> None:
     """Malformed GraphQL structures should raise MalformedResponseError."""
-    requests_mock.post(GITHUB_GRAPHQL_ENDPOINT, json=response_json)
+    requests_mock.post(GRAPHQL_ENDPOINT, json=response_json)
 
     with pytest.raises(MalformedResponseError, match=message):
         list(team_service.iter_team_members("mighty-llamas"))
@@ -166,7 +168,7 @@ def test_iter_team_members_requires_cursor_when_more_pages_exist(
 ) -> None:
     """When hasNextPage is true, a cursor must be provided."""
     requests_mock.post(
-        GITHUB_GRAPHQL_ENDPOINT,
+        GRAPHQL_ENDPOINT,
         json={
             "data": {
                 "organization": {
