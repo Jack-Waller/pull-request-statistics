@@ -12,7 +12,7 @@ from .pull_request_statistics import (
     PullRequestStatisticsService,
     PullRequestSummary,
 )
-from .pull_request_statistics.date_ranges import Half, Month, Quarter
+from .pull_request_statistics.date_ranges import DateRange, Half, Month, Quarter
 from .team_members import TeamMember, TeamMembersService
 
 __all__ = [
@@ -25,4 +25,5 @@ __all__ = [
     "Half",
     "Month",
     "Quarter",
+    "DateRange",
 ]

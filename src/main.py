@@ -11,6 +11,7 @@ import argparse
 from datetime import UTC, date, datetime
 
 from github_client import (
+    DateRange,
     GitHubClient,
     Half,
     MemberStatistics,
@@ -111,7 +112,7 @@ def gather_authored_statistics(
     args: argparse.Namespace,
     periods: dict,
     service: PullRequestStatisticsService,
-) -> tuple[list, tuple[object, int]]:
+) -> tuple[list, tuple[DateRange, int]]:
     authored = []
     if not args.counts_only:
         authored = list(
@@ -135,7 +136,7 @@ def gather_reviewed_statistics(
     args: argparse.Namespace,
     periods: dict,
     service: PullRequestStatisticsService,
-) -> tuple[list, tuple[object, int]]:
+) -> tuple[list, tuple[DateRange, int]]:
     reviewed = []
     if not args.counts_only:
         reviewed = list(
@@ -157,7 +158,7 @@ def print_authored_results(
     args: argparse.Namespace,
     user_login: str,
     authored: list,
-    authored_range: object,
+    authored_range: DateRange,
     authored_count: int,
 ) -> None:
     merged_suffix = " Merged only." if args.merged_only else ""
@@ -179,7 +180,7 @@ def print_reviewed_results(
     args: argparse.Namespace,
     reviewer: str,
     reviewed: list,
-    reviewed_range: object,
+    reviewed_range: DateRange,
     reviewed_count: int,
 ) -> None:
     suffix = " Excluding self-authored." if args.exclude_self_reviews else ""
@@ -202,7 +203,7 @@ def print_member_statistics(
     *,
     members: list[TeamMember],
     label: str,
-    date_range: object | None,
+    date_range: DateRange | None,
     statistics: list[MemberStatistics],
 ) -> None:
     member_lookup = {member.login.lower(): member for member in members}
