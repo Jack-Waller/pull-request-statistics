@@ -18,18 +18,14 @@ concurrency:
 
 jobs:
   test:
-    if: False # Temporarily disabled
     name: Lint and Test
-    runs-on: ubuntu-latest-small
+    runs-on: ubuntu-slim
     steps:
       - name: Checkout
         uses: actions/checkout@v6
 
       - name: Set up Python
         uses: astral-sh/setup-uv@v7
-
-      - name: Install dependencies
-        run: uv sync --frozen --all-extras --dev
 
       - name: Run coverage
         run: make coverage
