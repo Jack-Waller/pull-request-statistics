@@ -1,151 +1,137 @@
-"""Integration-style tests for pull request statistics with HTTP mocked via requests_mock."""
+"""Integration tests for pull request statistics built on mocked GitHub responses."""
 
-from datetime import date
+from github_client import GitHubClient, MemberStatistics, Month, PullRequestStatisticsService
 
-import pytest
-
-from github_client.client import GITHUB_GRAPHQL_ENDPOINT, GitHubClient
-from github_client.pull_request_statistics import PullRequestStatisticsService
-from github_client.pull_request_statistics.date_ranges import DateRangeFactory, Month
+GRAPHQL_URL = "https://api.github.com/graphql"
 
 
-@pytest.fixture
-def service() -> PullRequestStatisticsService:
-    """Provide a service instance with a dummy GitHub client."""
+def _build_service() -> PullRequestStatisticsService:
     return PullRequestStatisticsService(
-        GitHubClient(access_token="x" * 8),
+        GitHubClient(access_token="token"),  # noqa: S106 - placeholder token for mocked requests
         organisation="skyscanner",
         page_size=2,
-        date_range_factory=DateRangeFactory(default_today=date(2024, 12, 31)),
     )
 
 
-def test_authored_pull_requests_iter_and_count(requests_mock, service):
-    """Iterating and counting authored pull requests should drive the expected GraphQL calls."""
-    list_response = {
-        "search": {
-            "issueCount": 2,
-            "pageInfo": {"hasNextPage": False, "endCursor": None},
-            "nodes": [
-                {
-                    "number": 1,
-                    "title": "First change",
-                    "url": "https://github.com/skyscanner/example/pull/1",
-                    "createdAt": "2024-12-01T12:00:00Z",
-                    "author": {"login": "octocat"},
-                    "repository": {"nameWithOwner": "skyscanner/example"},
-                }
-            ],
-        }
-    }
-    count_response = {"search": {"issueCount": 2}}
-    requests_mock.post(
-        GITHUB_GRAPHQL_ENDPOINT,
-        response_list=[
-            {"json": {"data": list_response}, "status_code": 200},
-            {"json": {"data": count_response}, "status_code": 200},
-        ],
-    )
+def test_count_pull_requests_for_single_user(requests_mock) -> None:
+    service = _build_service()
+    requests_mock.post(GRAPHQL_URL, json={"data": {"search": {"issueCount": 4}}})
 
-    authored = list(
-        service.iter_pull_requests_by_author_in_date_range(
-            author="octocat",
-            month=Month.DECEMBER,
-            year=2024,
-            merged_only=False,
-        )
-    )
     _, total = service.count_pull_requests_by_author_in_date_range(
         author="octocat",
-        month=Month.DECEMBER,
+        month=Month.JANUARY,
         year=2024,
-        merged_only=False,
     )
 
-    assert len(authored) == 1
-    assert authored[0].number == 1
-    assert total == 2
-    # First request should be the list query.
-    assert "author:octocat org:skyscanner" in requests_mock.request_history[0].json()["variables"]["query"]
-    # Second request should be the count query.
-    assert "author:octocat org:skyscanner" in requests_mock.request_history[1].json()["variables"]["query"]
+    assert total == 4
+    query_text = requests_mock.last_request.json()["variables"]["query"]
+    assert query_text.startswith("author:octocat org:skyscanner is:pr created:")
+    assert "is:merged" not in query_text
 
 
-def test_reviewed_pull_requests_iter_and_count(requests_mock, service):
-    """Review queries should filter by reviewer and count via dedicated review query."""
-    count_response = {
-        "search": {
-            "pageInfo": {"hasNextPage": False, "endCursor": None},
-            "nodes": [
-                {
-                    "author": {"login": "other-user"},
-                    "reviews": {
-                        "edges": [
-                            {
-                                "node": {
-                                    "createdAt": "2024-12-02T10:00:00Z",
-                                    "author": {"login": "octocat"},
-                                }
-                            }
-                        ]
-                    },
-                }
-            ],
-        }
-    }
-    list_response = {
-        "search": {
-            "issueCount": 1,
-            "pageInfo": {"hasNextPage": False, "endCursor": None},
-            "nodes": [
-                {
-                    "number": 7,
-                    "title": "Reviewed change",
-                    "url": "https://github.com/skyscanner/example/pull/7",
-                    "createdAt": "2024-12-02T09:00:00Z",
-                    "author": {"login": "other-user"},
-                    "repository": {"nameWithOwner": "skyscanner/example"},
-                    "reviews": {
-                        "edges": [
-                            {
-                                "node": {
-                                    "createdAt": "2024-12-02T10:00:00Z",
-                                    "author": {"login": "octocat"},
-                                }
-                            }
-                        ]
-                    },
-                }
-            ],
-        }
-    }
+def test_fetch_opened_and_reviewed_pull_requests_for_user(requests_mock) -> None:
+    service = _build_service()
     requests_mock.post(
-        GITHUB_GRAPHQL_ENDPOINT,
+        GRAPHQL_URL,
         response_list=[
-            {"json": {"data": count_response}, "status_code": 200},
-            {"json": {"data": list_response}, "status_code": 200},
+            {"json": {"data": {"search": {"issueCount": 2}}}, "status_code": 200},
+            {
+                "json": {
+                    "data": {
+                        "search": {
+                            "pageInfo": {"hasNextPage": False, "endCursor": None},
+                            "nodes": [
+                                {
+                                    "author": {"login": "teammate"},
+                                    "reviews": {
+                                        "edges": [
+                                            {
+                                                "node": {
+                                                    "createdAt": "2024-01-15T10:00:00Z",
+                                                    "author": {"login": "octocat"},
+                                                }
+                                            }
+                                        ]
+                                    },
+                                }
+                            ],
+                        }
+                    }
+                },
+                "status_code": 200,
+            },
         ],
     )
 
-    _, count = service.count_pull_requests_reviewed_by_user_in_date_range(
-        reviewer="octocat",
-        month=Month.DECEMBER,
+    _, statistics = service.count_member_statistics(
+        members=["octocat"],
+        month=Month.JANUARY,
         year=2024,
-        exclude_self_authored=True,
-    )
-    reviewed = list(
-        service.iter_pull_requests_reviewed_by_user_in_date_range(
-            reviewer="octocat",
-            month=Month.DECEMBER,
-            year=2024,
-            exclude_self_authored=True,
-        )
     )
 
-    assert count == 1
-    assert len(reviewed) == 1
-    assert reviewed[0].number == 7
-    # First request should be the review count query.
-    assert "reviewed-by:octocat" in requests_mock.request_history[0].json()["variables"]["query"]
-    # Second request should be the review list query.
+    assert statistics == [
+        # 2 opened, 1 reviewed inside the window
+        MemberStatistics(login="octocat", authored_count=2, reviewed_count=1)
+    ]
+    assert "author:octocat" in requests_mock.request_history[0].json()["variables"]["query"]
     assert "reviewed-by:octocat" in requests_mock.request_history[1].json()["variables"]["query"]
+
+
+def test_fetch_statistics_for_multiple_users(requests_mock) -> None:
+    service = _build_service()
+    requests_mock.post(
+        GRAPHQL_URL,
+        response_list=[
+            {"json": {"data": {"search": {"issueCount": 2}}}, "status_code": 200},  # alice authored
+            {
+                "json": {
+                    "data": {
+                        "search": {
+                            "pageInfo": {"hasNextPage": False, "endCursor": None},
+                            "nodes": [],
+                        }
+                    }
+                },
+                "status_code": 200,
+            },  # alice reviewed
+            {"json": {"data": {"search": {"issueCount": 1}}}, "status_code": 200},  # bob authored
+            {
+                "json": {
+                    "data": {
+                        "search": {
+                            "pageInfo": {"hasNextPage": False, "endCursor": None},
+                            "nodes": [
+                                {
+                                    "author": {"login": "carol"},
+                                    "reviews": {
+                                        "edges": [
+                                            {
+                                                "node": {
+                                                    "createdAt": "2024-01-05T09:00:00Z",
+                                                    "author": {"login": "bob"},
+                                                }
+                                            }
+                                        ]
+                                    },
+                                }
+                            ],
+                        }
+                    }
+                },
+                "status_code": 200,
+            },  # bob reviewed
+        ],
+    )
+
+    _, statistics = service.count_member_statistics(
+        members=["alice", "bob", "alice"],
+        month=Month.JANUARY,
+        year=2024,
+    )
+
+    assert [entry.login for entry in statistics] == ["alice", "bob"]
+    assert statistics[0].authored_count == 2
+    assert statistics[0].reviewed_count == 0
+    assert statistics[1].authored_count == 1
+    assert statistics[1].reviewed_count == 1
+    assert len(requests_mock.request_history) == 4
