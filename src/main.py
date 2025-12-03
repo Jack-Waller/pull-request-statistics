@@ -10,11 +10,16 @@ from __future__ import annotations
 import argparse
 from datetime import UTC, date, datetime
 
-from github_client.client import GitHubClient
-from github_client.pull_request_statistics import PullRequestStatisticsService
-from github_client.pull_request_statistics.date_ranges import HalfName, MonthName, QuarterName
-from github_client.pull_request_statistics.models import MemberStatistics
-from github_client.team_members import TeamMember, TeamMembersService
+from github_client import (
+    GitHubClient,
+    Half,
+    MemberStatistics,
+    Month,
+    PullRequestStatisticsService,
+    Quarter,
+    TeamMember,
+    TeamMembersService,
+)
 from require_env import require_env
 
 
@@ -56,16 +61,16 @@ def default_periods(args: argparse.Namespace) -> None:
     if any((args.quarter, args.half, args.month, args.year, args.on_date, args.week)):
         return
     today = datetime.now(UTC).date()
-    current_quarter = QuarterName(((today.month - 1) // 3) + 1)
+    current_quarter = Quarter(((today.month - 1) // 3) + 1)
     args.quarter = current_quarter.name
 
 
 def parse_period_inputs(args: argparse.Namespace) -> dict:
     """Normalise CLI period inputs into service arguments."""
     default_periods(args)
-    quarter = QuarterName.from_string(args.quarter) if args.quarter else None
-    half = HalfName.from_string(args.half) if args.half else None
-    month = MonthName.from_string(args.month) if args.month else None
+    quarter = Quarter.from_string(args.quarter) if args.quarter else None
+    half = Half.from_string(args.half) if args.half else None
+    month = Month.from_string(args.month) if args.month else None
     on_date = date.fromisoformat(args.on_date) if args.on_date else None
     return {
         "quarter": quarter,

@@ -19,9 +19,9 @@ from github_client.errors import MalformedResponseError
 from github_client.pull_request_statistics.date_ranges import (
     DateRange,
     DateRangeFactory,
-    HalfName,
-    MonthName,
-    QuarterName,
+    Half,
+    Month,
+    Quarter,
 )
 from github_client.pull_request_statistics.models import MemberStatistics, PullRequestSummary
 
@@ -163,9 +163,9 @@ class PullRequestStatisticsService:
         *,
         author: str,
         year: int | None = None,
-        quarter: QuarterName | str | int | None = None,
-        month: MonthName | str | int | None = None,
-        half: HalfName | str | int | None = None,
+        quarter: Quarter | str | int | None = None,
+        month: Month | str | int | None = None,
+        half: Half | str | int | None = None,
         on_date: date | None = None,
         week: bool = False,
         merged_only: bool = False,
@@ -201,9 +201,9 @@ class PullRequestStatisticsService:
         *,
         author: str,
         year: int | None = None,
-        quarter: QuarterName | str | int | None = None,
-        month: MonthName | str | int | None = None,
-        half: HalfName | str | int | None = None,
+        quarter: Quarter | str | int | None = None,
+        month: Month | str | int | None = None,
+        half: Half | str | int | None = None,
         on_date: date | None = None,
         week: bool = False,
         merged_only: bool = False,
@@ -282,9 +282,9 @@ class PullRequestStatisticsService:
         *,
         reviewer: str,
         year: int | None = None,
-        quarter: QuarterName | str | int | None = None,
-        month: MonthName | str | int | None = None,
-        half: HalfName | str | int | None = None,
+        quarter: Quarter | str | int | None = None,
+        month: Month | str | int | None = None,
+        half: Half | str | int | None = None,
         on_date: date | None = None,
         week: bool = False,
         exclude_self_authored: bool = False,
@@ -327,9 +327,9 @@ class PullRequestStatisticsService:
         *,
         reviewer: str,
         year: int | None = None,
-        quarter: QuarterName | str | int | None = None,
-        month: MonthName | str | int | None = None,
-        half: HalfName | str | int | None = None,
+        quarter: Quarter | str | int | None = None,
+        month: Month | str | int | None = None,
+        half: Half | str | int | None = None,
         on_date: date | None = None,
         week: bool = False,
         exclude_self_authored: bool = False,
@@ -421,9 +421,9 @@ class PullRequestStatisticsService:
         *,
         members: Iterable[str],
         year: int | None = None,
-        quarter: QuarterName | str | int | None = None,
-        month: MonthName | str | int | None = None,
-        half: HalfName | str | int | None = None,
+        quarter: Quarter | str | int | None = None,
+        month: Month | str | int | None = None,
+        half: Half | str | int | None = None,
         on_date: date | None = None,
         week: bool = False,
         merged_only: bool = False,
@@ -588,9 +588,9 @@ class PullRequestStatisticsService:
     def _resolve_date_range(
         self,
         *,
-        half: HalfName | str | int | None = None,
-        month: MonthName | str | int | None = None,
-        quarter: QuarterName | str | int | None = None,
+        half: Half | str | int | None = None,
+        month: Month | str | int | None = None,
+        quarter: Quarter | str | int | None = None,
         year: int | None = None,
         on_date: date | None = None,
         week: bool = False,
@@ -632,13 +632,13 @@ class PullRequestStatisticsService:
     @staticmethod
     def _validate_period_inputs(
         *,
-        half: HalfName | str | int | None,
-        month: MonthName | str | int | None,
-        quarter: QuarterName | str | int | None,
+        half: Half | str | int | None,
+        month: Month | str | int | None,
+        quarter: Quarter | str | int | None,
         year: int | None,
         on_date: date | None,
         week: bool,
-    ) -> tuple[HalfName | None, MonthName | None, QuarterName | None, bool]:
+    ) -> tuple[Half | None, Month | None, Quarter | None, bool]:
         """Normalise and validate period selection inputs."""
         if all(period is None for period in (half, month, quarter, year, on_date)) and not week:
             raise ValueError("At least one of year, quarter, month, half, week or date is required.")
@@ -653,7 +653,7 @@ class PullRequestStatisticsService:
         if selected_periods > 1:
             raise ValueError("Specify only one of month, quarter or half.")
 
-        half_value = HalfName.from_string(half) if half is not None else None
-        month_value = MonthName.from_string(month) if month is not None else None
-        quarter_value = QuarterName.from_string(quarter) if quarter is not None else None
+        half_value = Half.from_string(half) if half is not None else None
+        month_value = Month.from_string(month) if month is not None else None
+        quarter_value = Quarter.from_string(quarter) if quarter is not None else None
         return half_value, month_value, quarter_value, week

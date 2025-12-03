@@ -5,7 +5,7 @@ from __future__ import annotations
 from enum import IntEnum
 
 
-class QuarterName(IntEnum):
+class Quarter(IntEnum):
     """Quarters of a calendar year."""
 
     Q1 = 1
@@ -14,7 +14,7 @@ class QuarterName(IntEnum):
     Q4 = 4
 
     @classmethod
-    def from_string(cls, value: str | int | QuarterName) -> QuarterName:
+    def from_string(cls, value: str | int | Quarter) -> Quarter:
         """
         Parse a quarter from a numeric or ``Qx`` representation.
 

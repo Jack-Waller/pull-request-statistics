@@ -6,7 +6,7 @@ import pytest
 
 from github_client.client import GITHUB_GRAPHQL_ENDPOINT, GitHubClient
 from github_client.pull_request_statistics import PullRequestStatisticsService
-from github_client.pull_request_statistics.date_ranges import DateRangeFactory, MonthName
+from github_client.pull_request_statistics.date_ranges import DateRangeFactory, Month
 
 
 @pytest.fixture
@@ -50,14 +50,14 @@ def test_authored_pull_requests_iter_and_count(requests_mock, service):
     authored = list(
         service.iter_pull_requests_by_author_in_date_range(
             author="octocat",
-            month=MonthName.DECEMBER,
+            month=Month.DECEMBER,
             year=2024,
             merged_only=False,
         )
     )
     _, total = service.count_pull_requests_by_author_in_date_range(
         author="octocat",
-        month=MonthName.DECEMBER,
+        month=Month.DECEMBER,
         year=2024,
         merged_only=False,
     )
@@ -129,14 +129,14 @@ def test_reviewed_pull_requests_iter_and_count(requests_mock, service):
 
     _, count = service.count_pull_requests_reviewed_by_user_in_date_range(
         reviewer="octocat",
-        month=MonthName.DECEMBER,
+        month=Month.DECEMBER,
         year=2024,
         exclude_self_authored=True,
     )
     reviewed = list(
         service.iter_pull_requests_reviewed_by_user_in_date_range(
             reviewer="octocat",
-            month=MonthName.DECEMBER,
+            month=Month.DECEMBER,
             year=2024,
             exclude_self_authored=True,
         )

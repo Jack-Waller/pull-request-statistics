@@ -5,14 +5,14 @@ from __future__ import annotations
 from enum import IntEnum
 
 
-class HalfName(IntEnum):
+class Half(IntEnum):
     """Halves of a calendar year."""
 
     H1 = 1
     H2 = 2
 
     @classmethod
-    def from_string(cls, value: str | int | HalfName) -> HalfName:
+    def from_string(cls, value: str | int | Half) -> Half:
         """
         Parse a half-year value from numeric or ``Hx`` representations.
 
