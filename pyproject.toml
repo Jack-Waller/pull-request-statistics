@@ -61,10 +61,7 @@ select = [
     "SIM",      # flake8-simplify
     "TID",      # flake8-tidy-imports
     "UP",       # pyupgrade
-"W",        # pycodestyle
-]
-ignore = [
-    "S608",     # NRQL queries are constructed as strings by design
+    "W",        # pycodestyle
 ]
 
 [tool.ruff.lint.per-file-ignores]
