@@ -5,7 +5,7 @@ description = "Tools for gathering and summarising GitHub pull request statistic
 readme = "README.md"
 requires-python = ">=3.12"
 dependencies = [
-    "importlib-resources>=5.4.0",
+    "importlib-resources>=7.1.0",
     "requests>=2.33.1",
     "setuptools>=80.9.0",
 ]
