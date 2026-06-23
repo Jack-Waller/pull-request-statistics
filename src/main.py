@@ -8,6 +8,7 @@ Environment variables:
 from __future__ import annotations
 
 import argparse
+import sys
 from datetime import UTC, date, datetime
 
 from github_client import (
@@ -38,6 +39,14 @@ def parse_args() -> argparse.Namespace:
         "--exclude-self-reviews",
         action="store_true",
         help="Exclude reviews on self-authored pull requests when counting reviewed PRs.",
+    )
+    parser.add_argument(
+        "--only-teammate-reviews",
+        action="store_true",
+        help=(
+            "Only count reviews on pull requests authored by a resolved teammate. "
+            "Requires --team or multiple --user values."
+        ),
     )
     parser.add_argument("--quarter", help="Quarter to search (e.g. Q1).")
     parser.add_argument("--half", help="Half-year to search (e.g. H1).")
@@ -281,6 +290,8 @@ def main() -> None:
         return
 
     multiple_members = len(members) > 1
+    if args.only_teammate_reviews and not multiple_members:
+        sys.exit("--only-teammate-reviews requires multiple members; provide --team or repeat --user.")
     if args.team or multiple_members:
         args.counts_only = True
         if args.team and args.user:
@@ -289,10 +300,12 @@ def main() -> None:
             label = f"team {args.team}"
         else:
             label = "specified users"
+        teammate_logins = frozenset(member.login.lower() for member in members) if args.only_teammate_reviews else None
         date_range, statistics = service.count_member_statistics(
             members=[member.login for member in members],
             merged_only=args.merged_only,
             exclude_self_authored=args.exclude_self_reviews,
+            teammate_logins=teammate_logins,
             **periods,
         )
         print_member_statistics(

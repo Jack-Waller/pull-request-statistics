@@ -1,6 +1,15 @@
 """Helpers for reading required environment variables."""
 
 from os import getenv
+from typing import Literal, overload
+
+
+@overload
+def require_env(var_name: str, require: Literal[True] = ...) -> str: ...
+
+
+@overload
+def require_env(var_name: str, require: Literal[False]) -> str | None: ...
 
 
 def require_env(var_name: str, require: bool = True) -> str | None:

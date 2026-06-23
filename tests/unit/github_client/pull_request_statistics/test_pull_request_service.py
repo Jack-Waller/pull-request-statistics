@@ -822,3 +822,189 @@ def test_week_cannot_be_combined_with_other_periods(service_with_mocked_client):
             week=True,
             year=2024,
         )
+
+
+def _reviewed_response_with_author(*, author_login: str | None, reviewer: str) -> dict:
+    author_field = {"login": author_login} if author_login is not None else None
+    return {
+        "search": {
+            "pageInfo": {"hasNextPage": False, "endCursor": None},
+            "nodes": [
+                {
+                    "author": author_field,
+                    "reviews": {
+                        "edges": [
+                            {
+                                "node": {
+                                    "createdAt": "2024-12-02T12:30:00Z",
+                                    "author": {"login": reviewer},
+                                }
+                            }
+                        ]
+                    },
+                }
+            ],
+        }
+    }
+
+
+def test_count_reviewed_excludes_non_teammate_authored_prs(service_with_mocked_client):
+    """Reviewed counting should skip pull requests whose author is not a teammate."""
+    response = _reviewed_response_with_author(author_login="carol", reviewer="bob")
+    service, _ = service_with_mocked_client(responses=[response], today=date(2024, 12, 31))
+
+    count = service._count_reviewed_within_range(
+        reviewer="bob",
+        date_range=DateRange(start_date=date(2024, 12, 1), end_date=date(2024, 12, 31)),
+        exclude_self_authored=False,
+        teammate_logins=frozenset({"alice", "bob"}),
+    )
+
+    assert count == 0
+
+
+def test_count_reviewed_includes_teammate_authored_prs(service_with_mocked_client):
+    """Reviewed counting should include pull requests authored by teammates."""
+    response = _reviewed_response_with_author(author_login="alice", reviewer="bob")
+    service, _ = service_with_mocked_client(responses=[response], today=date(2024, 12, 31))
+
+    count = service._count_reviewed_within_range(
+        reviewer="bob",
+        date_range=DateRange(start_date=date(2024, 12, 1), end_date=date(2024, 12, 31)),
+        exclude_self_authored=False,
+        teammate_logins=frozenset({"alice", "bob"}),
+    )
+
+    assert count == 1
+
+
+def test_count_reviewed_teammate_filter_is_case_insensitive(service_with_mocked_client):
+    """Teammate filtering should normalise author login casing before matching."""
+    response = _reviewed_response_with_author(author_login="Alice", reviewer="bob")
+    service, _ = service_with_mocked_client(responses=[response], today=date(2024, 12, 31))
+
+    count = service._count_reviewed_within_range(
+        reviewer="bob",
+        date_range=DateRange(start_date=date(2024, 12, 1), end_date=date(2024, 12, 31)),
+        exclude_self_authored=False,
+        teammate_logins=frozenset({"alice"}),
+    )
+
+    assert count == 1
+
+
+def test_count_reviewed_handles_null_author_with_teammate_filter(service_with_mocked_client):
+    """Pull requests with a null author should be excluded without raising when filtering."""
+    response = _reviewed_response_with_author(author_login=None, reviewer="bob")
+    service, _ = service_with_mocked_client(responses=[response], today=date(2024, 12, 31))
+
+    count = service._count_reviewed_within_range(
+        reviewer="bob",
+        date_range=DateRange(start_date=date(2024, 12, 1), end_date=date(2024, 12, 31)),
+        exclude_self_authored=False,
+        teammate_logins=frozenset({"alice", "bob"}),
+    )
+
+    assert count == 0
+
+
+def test_count_reviewed_without_teammate_filter_unchanged(service_with_mocked_client):
+    """Passing teammate_logins=None should leave behaviour identical to existing flow."""
+    response = _reviewed_response_with_author(author_login="carol", reviewer="bob")
+    service, _ = service_with_mocked_client(responses=[response], today=date(2024, 12, 31))
+
+    count = service._count_reviewed_within_range(
+        reviewer="bob",
+        date_range=DateRange(start_date=date(2024, 12, 1), end_date=date(2024, 12, 31)),
+        exclude_self_authored=False,
+        teammate_logins=None,
+    )
+
+    assert count == 1
+
+
+def test_count_member_statistics_forwards_teammate_logins(service_with_mocked_client):
+    """count_member_statistics should constrain reviewed counts but not authored counts."""
+    responses = [
+        {"search": {"issueCount": 2}},
+        {
+            "search": {
+                "pageInfo": {"hasNextPage": False, "endCursor": None},
+                "nodes": [
+                    {
+                        "author": {"login": "bob"},
+                        "reviews": {
+                            "edges": [
+                                {
+                                    "node": {
+                                        "createdAt": "2024-12-02T12:30:00Z",
+                                        "author": {"login": "alice"},
+                                    }
+                                }
+                            ]
+                        },
+                    },
+                    {
+                        "author": {"login": "carol"},
+                        "reviews": {
+                            "edges": [
+                                {
+                                    "node": {
+                                        "createdAt": "2024-12-03T12:30:00Z",
+                                        "author": {"login": "alice"},
+                                    }
+                                }
+                            ]
+                        },
+                    },
+                ],
+            }
+        },
+        {"search": {"issueCount": 3}},
+        {
+            "search": {
+                "pageInfo": {"hasNextPage": False, "endCursor": None},
+                "nodes": [
+                    {
+                        "author": {"login": "alice"},
+                        "reviews": {
+                            "edges": [
+                                {
+                                    "node": {
+                                        "createdAt": "2024-12-04T12:30:00Z",
+                                        "author": {"login": "bob"},
+                                    }
+                                }
+                            ]
+                        },
+                    },
+                    {
+                        "author": {"login": "dave"},
+                        "reviews": {
+                            "edges": [
+                                {
+                                    "node": {
+                                        "createdAt": "2024-12-05T12:30:00Z",
+                                        "author": {"login": "bob"},
+                                    }
+                                }
+                            ]
+                        },
+                    },
+                ],
+            }
+        },
+    ]
+    service, _ = service_with_mocked_client(responses=responses, today=date(2024, 12, 31))
+
+    _, statistics = service.count_member_statistics(
+        members=["alice", "bob"],
+        month=Month.DECEMBER,
+        year=2024,
+        teammate_logins=frozenset({"alice", "bob"}),
+    )
+
+    assert statistics == [
+        MemberStatistics(login="alice", authored_count=2, reviewed_count=1),
+        MemberStatistics(login="bob", authored_count=3, reviewed_count=1),
+    ]
