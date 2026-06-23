@@ -86,6 +86,7 @@ uv run src/main.py --user <login> --organisation <org>
 | `--page-size` | No | Page size for GitHub API pagination (default: 50) |
 | `--counts-only` | No | Only fetch counts, skip fetching full pull request lists |
 | `--team` | No | Team slug within the organisation to summarise. Counts-only output is enabled automatically and you can combine this with `--user` to include extra logins |
+| `--only-teammate-reviews` | No | Only count reviews on pull requests authored by a resolved teammate. Requires `--team` or multiple `--user` values |
 
 If no quarter, half, month, week, year, or date is provided, the tool defaults to the current quarter. When a team is provided or more than one user is supplied, counts-only mode is enabled automatically and the output is a per-member summary.
 

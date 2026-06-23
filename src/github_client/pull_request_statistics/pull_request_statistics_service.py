@@ -428,6 +428,7 @@ class PullRequestStatisticsService:
         week: bool = False,
         merged_only: bool = False,
         exclude_self_authored: bool = False,
+        teammate_logins: frozenset[str] | None = None,
     ) -> tuple[DateRange | None, list[MemberStatistics]]:
         """Return authored and reviewed counts for each member in one call."""
         unique_members = [login for login in dict.fromkeys(members) if login]
@@ -449,6 +450,7 @@ class PullRequestStatisticsService:
                 reviewer=member,
                 date_range=date_range,
                 exclude_self_authored=exclude_self_authored,
+                teammate_logins=teammate_logins,
             )
             statistics.append(
                 MemberStatistics(
@@ -483,6 +485,7 @@ class PullRequestStatisticsService:
         reviewer: str,
         date_range: DateRange,
         exclude_self_authored: bool,
+        teammate_logins: frozenset[str] | None = None,
     ) -> int:
         search_query = self._build_review_search_query(
             reviewer=reviewer,
@@ -508,8 +511,13 @@ class PullRequestStatisticsService:
             for node in nodes:
                 if node is None:
                     continue
-                if exclude_self_authored and node.get("author", {}).get("login") == reviewer:
+                author_login: str | None = (node.get("author") or {}).get("login")
+                if exclude_self_authored and author_login == reviewer:
                     continue
+                if teammate_logins is not None:
+                    normalised_author = author_login.lower() if author_login else None
+                    if normalised_author is None or normalised_author not in teammate_logins:
+                        continue
                 if self._has_review_in_range(
                     reviews=node.get("reviews"),
                     reviewer=reviewer,
